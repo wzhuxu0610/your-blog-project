@@ -46,9 +46,6 @@ json
 
 {
   "version": 1,
-  
   "include": ["/*"],
-  
   "exclude": []
-  
 }
