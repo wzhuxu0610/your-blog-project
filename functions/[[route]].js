@@ -1,7 +1,10 @@
 // /functions/[[route]].js - Cloudflare Pages Functions
 
+// ========== 修改这里的用户名和密码 ==========
 const USERNAME = "admin";
 const PASSWORD = "ww123456";
+// =========================================
+
 const LOGO_KV_KEY = "site_logo_info";
 
 function verifyToken(token) {
@@ -14,13 +17,11 @@ function verifyToken(token) {
   }
 }
 
-// 获取完整URL
 function getFullUrl(request) {
   const url = new URL(request.url);
   return url;
 }
 
-// 获取Logo
 async function handleGetLogo(env) {
   try {
     const logoData = await env.BLOG_KV.get(LOGO_KV_KEY);
@@ -44,7 +45,6 @@ async function handleGetLogo(env) {
   }
 }
 
-// 上传/更换Logo
 async function handleUploadLogo(request, env) {
   const auth = request.headers.get("Authorization");
   const token = auth?.replace("Bearer ", "");
@@ -109,7 +109,6 @@ async function handleUploadLogo(request, env) {
   }
 }
 
-// 删除Logo
 async function handleDeleteLogo(request, env) {
   const auth = request.headers.get("Authorization");
   const token = auth?.replace("Bearer ", "");
@@ -142,7 +141,6 @@ async function handleDeleteLogo(request, env) {
   }
 }
 
-// 登录接口
 async function handleLogin(request) {
   try {
     const { username, password } = await request.json();
@@ -167,7 +165,6 @@ async function handleLogin(request) {
   }
 }
 
-// 图片上传接口
 async function handleUploadImage(request, env) {
   const auth = request.headers.get("Authorization");
   const token = auth?.replace("Bearer ", "");
@@ -211,7 +208,6 @@ async function handleUploadImage(request, env) {
   }
 }
 
-// 获取文章列表
 async function handleGetBlogs(env) {
   try {
     const list = [];
@@ -243,7 +239,6 @@ async function handleGetBlogs(env) {
   }
 }
 
-// 获取单篇文章
 async function handleGetBlog(id, env) {
   if (!id) return new Response(JSON.stringify({ error: "不存在" }), { status: 404 });
   const value = await env.BLOG_KV.get(id);
@@ -258,7 +253,6 @@ async function handleGetBlog(id, env) {
   }), { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
 }
 
-// 创建文章
 async function handleCreateBlog(request, env) {
   const auth = request.headers.get("Authorization");
   const token = auth?.replace("Bearer ", "");
@@ -282,7 +276,6 @@ async function handleCreateBlog(request, env) {
   });
 }
 
-// 更新文章
 async function handleUpdateBlog(id, request, env) {
   const auth = request.headers.get("Authorization");
   const token = auth?.replace("Bearer ", "");
@@ -316,7 +309,6 @@ async function handleUpdateBlog(id, request, env) {
   });
 }
 
-// 删除文章
 async function handleDeleteBlog(id, request, env) {
   const auth = request.headers.get("Authorization");
   const token = auth?.replace("Bearer ", "");
@@ -329,7 +321,6 @@ async function handleDeleteBlog(id, request, env) {
   });
 }
 
-// 图片访问接口
 async function handleGetImage(key, env) {
   if (!key) return new Response("Not Found", { status: 404 });
   
@@ -346,7 +337,6 @@ async function handleGetImage(key, env) {
   });
 }
 
-// 处理OPTIONS请求
 function handleOptions() {
   return new Response(null, {
     headers: {
@@ -357,26 +347,22 @@ function handleOptions() {
   });
 }
 
-// 主路由处理函数 - 唯一导出
 export async function onRequest(context) {
   const { request, env } = context;
   const url = new URL(request.url);
   const path = url.pathname;
   const method = request.method;
   
-  // 处理根路径 - 返回HTML页面
   if (method === "GET" && path === "/") {
     return new Response(getHTML(), {
       headers: { "Content-Type": "text/html;charset=UTF-8" }
     });
   }
   
-  // 处理OPTIONS
   if (method === "OPTIONS") {
     return handleOptions();
   }
   
-  // 路由处理
   if (method === "GET" && path === "/api/logo") {
     return handleGetLogo(env);
   }
@@ -425,7 +411,6 @@ export async function onRequest(context) {
     return handleDeleteBlog(id, request, env);
   }
   
-  // 如果路径不是/api开头，返回HTML（支持SPA路由）
   if (method === "GET" && !path.startsWith("/api/")) {
     return new Response(getHTML(), {
       headers: { "Content-Type": "text/html;charset=UTF-8" }
@@ -435,7 +420,6 @@ export async function onRequest(context) {
   return new Response("Not Found", { status: 404 });
 }
 
-// HTML页面
 function getHTML() {
   return '<!DOCTYPE html>' +
 '<html>' +
