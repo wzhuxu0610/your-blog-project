@@ -72,7 +72,7 @@ git remote add origin https://github.com/你的用户名/your-blog-project.git
 
 git push -u origin main
 
-六、部署到 Cloudflare Pages
+## 部署到 Cloudflare Pages
 
 方式一：连接 Git 仓库（推荐）
 
@@ -116,7 +116,7 @@ git push -u origin main
 
 点击部署
 
-七、绑定 KV 命名空间（重要！）
+## 绑定 KV 命名空间（重要！）
 
 部署完成后，需要绑定 KV：
 
@@ -136,7 +136,7 @@ KV 命名空间：选择你之前创建的 blog_kv
 
 点击 保存
 
-八、重新部署（使 KV 绑定生效）
+## 重新部署（使 KV 绑定生效）
 
 绑定 KV 后，需要重新部署：
 
@@ -148,7 +148,7 @@ KV 命名空间：选择你之前创建的 blog_kv
 
 或者推送一次空的 commit 到 GitHub 触发自动部署
 
-九、访问你的博客
+## 访问你的博客
 
 部署成功后，你会获得一个地址：
 
@@ -162,7 +162,7 @@ https://your-blog.pages.dev
 
 密码：ww123456
 
-十、配置自定义域名（可选）
+## 配置自定义域名（可选）
 
 进入 Pages 项目 → 自定义域 标签
 
@@ -172,7 +172,7 @@ https://your-blog.pages.dev
 
 按照提示添加 DNS 记录
 
-十一、修改密码
+## 修改密码
 
 如果你需要修改管理员密码，直接修改代码中的这两行：
 
@@ -182,7 +182,7 @@ const PASSWORD = "ww123456";   // 修改成你想要的密码
 
 然后重新推送到 GitHub，Pages 会自动重新部署。
 
-十二、常见问题排查
+## 常见问题排查
 
 问题	解决方法
 
@@ -194,13 +194,13 @@ API 请求失败	检查 KV 绑定是否完成（变量名必须为 BLOG_KV）
 
 登录后没反应	清除浏览器缓存，重新登录
 
-项目结构总结
-text
+## 项目结构总结
+
 your-blog-project/
 
-├── functions/
+   ├── functions/
 
-   └── [[route]].js     ← 所有后端逻辑
+   ---└── [[route]].js     ← 所有后端逻辑
    
-└── _routes.json         ← 路由配置
+根目录└── _routes.json         ← 路由配置
 
