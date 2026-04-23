@@ -29,16 +29,26 @@ text
 
 text
 your-blog-project/
+
 ├── functions/
+
 │   └── [[route]].js
+
 └── _routes.json
-文件1：functions/[[route]].js（完整代码见下方）
+
+文件1：functions/[[route]].js
+
+（完整代码见下方）
 
 文件2：_routes.json
 
 json
+
 {
   "version": 1,
+  
   "include": ["/*"],
+  
   "exclude": []
+  
 }
