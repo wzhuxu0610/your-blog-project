@@ -357,7 +357,7 @@ function handleOptions() {
   });
 }
 
-// 主路由处理函数
+// 主路由处理函数 - 唯一导出
 export async function onRequest(context) {
   const { request, env } = context;
   const url = new URL(request.url);
@@ -512,8 +512,6 @@ function getHTML() {
 '<div class="main" id="content"></div>' +
 '</div>' +
 '<script>' +
-'// 使用相对路径，避免跨域问题\n' +
-'var API_BASE = "";\n' +
 'var currentImage = "";' +
 'var editId = null;' +
 'var currentLogoUrl = "";' +
@@ -919,6 +917,3 @@ function getHTML() {
 '</body>' +
 '</html>';
 }
-
-// 导出 onRequest 函数供 Pages 使用
-export { onRequest };
