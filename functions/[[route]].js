@@ -500,6 +500,7 @@ function getHTML() {
 'var editId = null;' +
 'var currentLogoUrl = "";' +
 'var logoVersion = 0;' +
+
 'async function loadLogo() {' +
 '  try {' +
 '    var res = await fetch("/api/logo");' +
@@ -519,9 +520,11 @@ function getHTML() {
 '    updateLogoDisplay(null);' +
 '  }' +
 '}' +
+
 'function updateLogoDisplay(url) {' +
 '  var logoImg = document.getElementById("logoImg");' +
 '  var placeholder = document.getElementById("logoPlaceholder");' +
+'  if (!logoImg || !placeholder) return;' +
 '  if (url && url !== "") {' +
 '    logoImg.src = url + "?v=" + logoVersion;' +
 '    logoImg.classList.remove("hidden");' +
@@ -531,13 +534,16 @@ function getHTML() {
 '    placeholder.classList.remove("hidden");' +
 '  }' +
 '}' +
+
 'async function refreshLogoDisplay() {' +
 '  await loadLogo();' +
 '}' +
+
 'function goHome() { showHome(); }' +
 'function goLogin() { showLogin(); }' +
 'function goPublish() { editId = null; currentImage = ""; showPublish(); }' +
 'function goManage() { showManage(); }' +
+
 'function updateNav() {' +
 '  var t = localStorage.getItem("token");' +
 '  var l = !!t;' +
@@ -550,6 +556,7 @@ function getHTML() {
 '  if(lb) { if(l) lb.classList.add("hidden"); else lb.classList.remove("hidden"); }' +
 '  if(lbt) { if(l) lbt.classList.remove("hidden"); else lbt.classList.add("hidden"); }' +
 '}' +
+
 'function logout() {' +
 '  localStorage.removeItem("token");' +
 '  currentImage = "";' +
@@ -557,6 +564,7 @@ function getHTML() {
 '  updateNav();' +
 '  showHome();' +
 '}' +
+
 'function insertLink() {' +
 '  var ta = document.getElementById("contentText");' +
 '  if(!ta){ alert("请先输入内容"); return; }' +
@@ -573,6 +581,7 @@ function getHTML() {
 '    ta.focus();' +
 '  }' +
 '}' +
+
 'function insertImage() {' +
 '  var ta = document.getElementById("contentText");' +
 '  if(!ta){ alert("请先输入内容"); return; }' +
@@ -585,6 +594,7 @@ function getHTML() {
 '    ta.focus();' +
 '  }' +
 '}' +
+
 'function formatText(tag) {' +
 '  var ta = document.getElementById("contentText");' +
 '  if(!ta) return;' +
@@ -604,8 +614,10 @@ function getHTML() {
 '    ta.focus();' +
 '  }' +
 '}' +
+
 'async function showHome() {' +
 '  var div = document.getElementById("content");' +
+'  if (!div) { console.error("content element not found"); return; }' +
 '  div.innerHTML = "<h2>文章列表</h2><div id=posts>加载中...</div>";' +
 '  try{' +
 '    var res = await fetch("/api/blog");' +
@@ -621,13 +633,17 @@ function getHTML() {
 '        html += "</div>";' +
 '      }' +
 '    } else { html = "<p>暂无文章</p>"; }' +
-'    document.getElementById("posts").innerHTML = html;' +
+'    var postsDiv = document.getElementById("posts");' +
+'    if (postsDiv) postsDiv.innerHTML = html;' +
 '  } catch(e){' +
-'    document.getElementById("posts").innerHTML = "<p>加载失败</p>";' +
+'    var postsDiv = document.getElementById("posts");' +
+'    if (postsDiv) postsDiv.innerHTML = "<p>加载失败</p>";' +
 '  }' +
 '}' +
+
 'async function viewPost(id) {' +
 '  var div = document.getElementById("content");' +
+'  if (!div) return;' +
 '  div.innerHTML = "<button onclick=showHome()>返回</button><div>加载中...</div>";' +
 '  try{' +
 '    var res = await fetch("/api/blog/"+id);' +
@@ -645,6 +661,7 @@ function getHTML() {
 '    div.innerHTML = "<button onclick=showHome()>返回</button><p>加载失败</p>";' +
 '  }' +
 '}' +
+
 'async function editPost(id) {' +
 '  var token = localStorage.getItem("token");' +
 '  if(!token){ alert("请先登录"); showLogin(); return; }' +
@@ -654,15 +671,17 @@ function getHTML() {
 '    editId = id;' +
 '    currentImage = p.img || "";' +
 '    var div = document.getElementById("content");' +
+'    if (!div) return;' +
 '    div.innerHTML = "<h2>编辑文章</h2><div style=margin:20px 0><input id=title type=text placeholder=标题 value=\\""+escapeHtml(p.title)+"\\"><br><div class=toolbar><button onclick=formatText(\\"bold\\")><b>B</b></button><button onclick=formatText(\\"italic\\")><i>I</i></button><button onclick=formatText(\\"underline\\")><u>U</u></button><button onclick=formatText(\\"h3\\")>H3</button><button onclick=insertLink()>🔗插入链接</button><button onclick=insertImage()>🖼️插入图片</button></div><textarea id=contentText rows=12 placeholder=内容>"+escapeHtml(p.content)+"</textarea><br><input type=file id=imgFile accept=image/*><br><button onclick=uploadImg()>上传图片</button><div id=preview></div><button onclick=doUpdate()>更新文章</button><button onclick=goManage()>取消</button></div>";' +
 '    if(currentImage){' +
 '      document.getElementById("preview").innerHTML = "<img src=\\""+currentImage+"\\" class=preview-img><br><button onclick=removeImg()>移除图片</button>";' +
 '    }' +
 '  } catch(e){ alert("加载文章失败"); }' +
 '}' +
+
 'async function doUpdate() {' +
-'  var title = document.getElementById("title").value.trim();' +
-'  var content = document.getElementById("contentText").value;' +
+'  var title = document.getElementById("title")?.value.trim();' +
+'  var content = document.getElementById("contentText")?.value;' +
 '  if(!title){ alert("请输入标题"); return; }' +
 '  try{' +
 '    var res = await fetch("/api/blog/"+editId,{' +
@@ -675,6 +694,7 @@ function getHTML() {
 '    else { alert("更新失败"); }' +
 '  } catch(e){ alert("更新失败"); }' +
 '}' +
+
 'async function delPostFromView(id) {' +
 '  if(!confirm("确定删除这篇文章？")) return;' +
 '  try{' +
@@ -683,13 +703,16 @@ function getHTML() {
 '    else { alert("删除失败"); }' +
 '  } catch(e){ alert("删除失败"); }' +
 '}' +
+
 'function showLogin() {' +
 '  var div = document.getElementById("content");' +
+'  if (!div) return;' +
 '  div.innerHTML = "<h2>登录</h2><form autocomplete=off><input id=user type=text placeholder=用户名 autocomplete=off style=width:100%><br><input id=pass type=password placeholder=密码 autocomplete=new-password style=width:100%><br><button type=button onclick=doLogin()>登录</button></form>";' +
 '}' +
+
 'async function doLogin() {' +
-'  var user = document.getElementById("user").value;' +
-'  var pass = document.getElementById("pass").value;' +
+'  var user = document.getElementById("user")?.value;' +
+'  var pass = document.getElementById("pass")?.value;' +
 '  if(!user||!pass){ alert("请输入用户名和密码"); return; }' +
 '  try{' +
 '    var res = await fetch("/api/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:user,password:pass})});' +
@@ -701,16 +724,19 @@ function getHTML() {
 '    } else { alert("登录失败，用户名或密码错误"); }' +
 '  } catch(e){ alert("登录失败"); }' +
 '}' +
+
 'function showPublish() {' +
 '  var token = localStorage.getItem("token");' +
 '  if(!token){ showLogin(); return; }' +
 '  currentImage = "";' +
 '  editId = null;' +
 '  var div = document.getElementById("content");' +
+'  if (!div) return;' +
 '  div.innerHTML = "<h2>发布文章</h2><div style=margin:20px 0><input id=title type=text placeholder=标题><br><div class=toolbar><button onclick=formatText(\\"bold\\")><b>B</b></button><button onclick=formatText(\\"italic\\")><i>I</i></button><button onclick=formatText(\\"underline\\")><u>U</u></button><button onclick=formatText(\\"h3\\")>H3</button><button onclick=insertLink()>🔗插入链接</button><button onclick=insertImage()>🖼️插入图片</button></div><textarea id=contentText rows=12 placeholder=内容></textarea><br><input type=file id=imgFile accept=image/*><br><button onclick=uploadImg()>上传图片</button><div id=preview></div><button onclick=doPublish()>发布文章</button></div>";' +
 '}' +
+
 'async function uploadImg() {' +
-'  var file = document.getElementById("imgFile").files[0];' +
+'  var file = document.getElementById("imgFile")?.files[0];' +
 '  if(!file){ alert("请选择图片"); return; }' +
 '  if(!file.type.startsWith("image/")){ alert("请选择图片文件"); return; }' +
 '  var form = new FormData();' +
@@ -721,11 +747,12 @@ function getHTML() {
 '    if(data.success){' +
 '      currentImage = data.url;' +
 '      var preview = document.getElementById("preview");' +
-'      preview.innerHTML = "<img src=\\""+data.url+"\\" class=preview-img><br><button onclick=removeImg()>移除图片</button>";' +
+'      if(preview) preview.innerHTML = "<img src=\\""+data.url+"\\" class=preview-img><br><button onclick=removeImg()>移除图片</button>";' +
 '      alert("图片上传成功");' +
 '    } else { alert("上传失败："+(data.message||"未知错误")); }' +
 '  } catch(e){ alert("上传失败"); }' +
 '}' +
+
 'function removeImg() {' +
 '  currentImage = "";' +
 '  var preview = document.getElementById("preview");' +
@@ -733,9 +760,10 @@ function getHTML() {
 '  var fileInput = document.getElementById("imgFile");' +
 '  if(fileInput) fileInput.value = "";' +
 '}' +
+
 'async function doPublish() {' +
-'  var title = document.getElementById("title").value.trim();' +
-'  var content = document.getElementById("contentText").value;' +
+'  var title = document.getElementById("title")?.value.trim();' +
+'  var content = document.getElementById("contentText")?.value;' +
 '  if(!title){ alert("请输入标题"); return; }' +
 '  try{' +
 '    var res = await fetch("/api/blog",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+localStorage.getItem("token")},body:JSON.stringify({title:title,content:content,img:currentImage})});' +
@@ -744,6 +772,7 @@ function getHTML() {
 '    else { alert("发布失败"); }' +
 '  } catch(e){ alert("发布失败"); }' +
 '}' +
+
 'async function uploadLogo(file) {' +
 '  if (!file) return false;' +
 '  if (!file.type.startsWith("image/")) {' +
@@ -779,6 +808,7 @@ function getHTML() {
 '    return false;' +
 '  }' +
 '}' +
+
 'async function deleteLogo() {' +
 '  if (!confirm("确定要删除Logo恢复默认吗？")) return;' +
 '  try {' +
@@ -802,10 +832,12 @@ function getHTML() {
 '    return false;' +
 '  }' +
 '}' +
+
 'async function showManage() {' +
 '  var token = localStorage.getItem("token");' +
 '  if(!token){ showLogin(); return; }' +
 '  var div = document.getElementById("content");' +
+'  if (!div) return;' +
 '  var currentLogoHtml = "";' +
 '  if (currentLogoUrl) {' +
 '    currentLogoHtml = "<img src=\'" + currentLogoUrl + "?v=" + logoVersion + "\' class=\'current-logo-preview\' id=\'manageLogoPreview\' alt=\'Logo预览\'>";' +
@@ -827,16 +859,19 @@ function getHTML() {
 '    "</div></div>" +' +
 '    "<h3>📄 文章管理</h3>" +' +
 '    "<div id=posts>加载中...</div>";' +
+
 '  var fileInput = document.createElement("input");' +
 '  fileInput.type = "file";' +
 '  fileInput.id = "logoUploadInput";' +
 '  fileInput.accept = "image/png,image/jpeg,image/jpg,image/gif,image/webp";' +
 '  fileInput.style.display = "none";' +
 '  div.appendChild(fileInput);' +
+
 '  var selectBtn = document.getElementById("selectLogoBtn");' +
 '  if (selectBtn) {' +
 '    selectBtn.onclick = function() { fileInput.click(); };' +
 '  }' +
+
 '  fileInput.onchange = async function(e) {' +
 '    if (e.target.files && e.target.files[0]) {' +
 '      var success = await uploadLogo(e.target.files[0]);' +
@@ -847,6 +882,7 @@ function getHTML() {
 '    }' +
 '    fileInput.value = "";' +
 '  };' +
+
 '  var deleteBtn = document.getElementById("deleteLogoBtn");' +
 '  if (deleteBtn && currentLogoUrl) {' +
 '    deleteBtn.onclick = async function() {' +
@@ -857,6 +893,7 @@ function getHTML() {
 '      }' +
 '    };' +
 '  }' +
+
 '  try{' +
 '    var res = await fetch("/api/blog");' +
 '    var data = await res.json();' +
@@ -871,11 +908,14 @@ function getHTML() {
 '        html += "</div>";' +
 '      }' +
 '    } else { html = "<p>暂无文章</p>"; }' +
-'    document.getElementById("posts").innerHTML = html;' +
+'    var postsDiv = document.getElementById("posts");' +
+'    if (postsDiv) postsDiv.innerHTML = html;' +
 '  } catch(e){' +
-'    document.getElementById("posts").innerHTML = "<p>加载失败</p>";' +
+'    var postsDiv = document.getElementById("posts");' +
+'    if (postsDiv) postsDiv.innerHTML = "<p>加载失败</p>";' +
 '  }' +
 '}' +
+
 'async function delPost(id) {' +
 '  if(!confirm("确定删除？")) return;' +
 '  try{' +
@@ -884,6 +924,7 @@ function getHTML() {
 '    else { alert("删除失败"); }' +
 '  } catch(e){ alert("删除失败"); }' +
 '}' +
+
 'function escapeHtml(str) {' +
 '  if(!str) return "";' +
 '  return str.replace(/[&<>]/g, function(m) {' +
@@ -893,10 +934,15 @@ function getHTML() {
 '    return m;' +
 '  });' +
 '}' +
-'loadLogo().then(function() {' +
-'  updateNav();' +
-'  showHome();' +
-'});' +
+
+'// 等待DOM加载完成后初始化' +
+'if (document.readyState === "loading") {' +
+'  document.addEventListener("DOMContentLoaded", function() {' +
+'    loadLogo().then(function() { updateNav(); showHome(); });' +
+'  });' +
+'} else {' +
+'  loadLogo().then(function() { updateNav(); showHome(); });' +
+'}' +
 '</script>' +
 '</body>' +
 '</html>';
