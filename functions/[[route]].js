@@ -796,7 +796,7 @@ function renderQuickButtons() {
   for (var i = 0; i < quickButtons.length; i++) {
     var btn = quickButtons[i];
     if (btn.enabled !== false) {
-      html += "<a href=\\"" + escapeHtml(btn.url) + "\\" class=\\"quick-btn\\" target=\\"_blank\\" rel=\\"noopener noreferrer\\">" + escapeHtml(btn.name) + "</a>";
+      html += "<a href=\'" + escapeHtml(btn.url) + "\' class=\'quick-btn\' target=\'_blank\' rel=\'noopener noreferrer\'>" + escapeHtml(btn.name) + "</a>";
     }
   }
   container.innerHTML = html;
@@ -817,17 +817,17 @@ function renderArticlesList() {
   var container = document.getElementById("articlesList");
   if (!container) return;
   if (allPosts.length === 0) {
-    container.innerHTML = "<div style=\\"text-align:center;color:#adb5bd;padding:20px\\">暂无文章</div>";
+    container.innerHTML = "<div style=\'text-align:center;color:#adb5bd;padding:20px\'>暂无文章</div>";
     return;
   }
   var html = "";
   for (var i = 0; i < allPosts.length; i++) {
     var post = allPosts[i];
     var activeClass = (currentPostId === post.id) ? "active" : "";
-    var topTag = post.top ? " <span style='color:#ff6b6b'>[置顶]</span>" : "";
-    html += "<div class=\\"article-item " + activeClass + "\\" onclick=\\"loadPost('" + post.id + "')\\">" +
-      "<div class=\\"article-title\\">" + escapeHtml(post.title) + topTag + "</div>" +
-      "<div class=\\"article-time\\">" + new Date(post.time).toLocaleDateString() + "</div>" +
+    var topTag = post.top ? " <span style=\'color:#ff6b6b\'>[置顶]</span>" : "";
+    html += "<div class=\'article-item " + activeClass + "\' onclick=\'loadPost(\'" + post.id + "\')\'>" +
+      "<div class=\'article-title\'>" + escapeHtml(post.title) + topTag + "</div>" +
+      "<div class=\'article-time\'>" + new Date(post.time).toLocaleDateString() + "</div>" +
       "</div>";
   }
   container.innerHTML = html;
@@ -872,14 +872,14 @@ function displayPost(post) {
   var token = localStorage.getItem("token");
   var editHtml = "";
   if (token && post.id) {
-    editHtml = "<div style=\\"margin-top:30px;display:flex;gap:12px\\"><button class=\\"btn-secondary\\" onclick=\\"editPost('" + post.id + "')\\">编辑文章</button><button class=\\"btn-danger\\" onclick=\\"deletePost('" + post.id + "')\\">删除文章</button></div>";
+    editHtml = "<div style=\'margin-top:30px;display:flex;gap:12px\'><button class=\'btn-secondary\' onclick=\'editPost(\'" + post.id + "\')\'>编辑文章</button><button class=\'btn-danger\' onclick=\'deletePost(\'" + post.id + "\')\'>删除文章</button></div>";
   }
-  var topTag = post.top ? " <span style='color:#ff6b6b'>[置顶]</span>" : "";
-  var html = "<div class=\\"content-card\\">" +
-    "<h1 class=\\"post-title\\">" + escapeHtml(post.title || "无标题") + topTag + "</h1>" +
-    "<div class=\\"post-meta\\">发布时间：" + (post.time ? new Date(post.time).toLocaleString() : "未知") + "</div>" +
-    (post.img ? "<img src=\\"" + post.img + "\\" class=\\"post-img\\" alt=\\"封面\\">" : "") +
-    "<div class=\\"post-content\\">" + (post.content ? post.content.replace(/\\n/g, "<br>") : "") + "</div>" +
+  var topTag = post.top ? " <span style=\'color:#ff6b6b\'>[置顶]</span>" : "";
+  var html = "<div class=\'content-card\'>" +
+    "<h1 class=\'post-title\'>" + escapeHtml(post.title || "无标题") + topTag + "</h1>" +
+    "<div class=\'post-meta\'>发布时间：" + (post.time ? new Date(post.time).toLocaleString() : "未知") + "</div>" +
+    (post.img ? "<img src=\'" + post.img + "\' class=\'post-img\' alt=\'封面\'>" : "") +
+    "<div class=\'post-content\'>" + (post.content ? post.content.replace(/\\n/g, "<br>") : "") + "</div>" +
     editHtml +
     "</div>";
   container.innerHTML = html;
@@ -888,7 +888,7 @@ function displayPost(post) {
 function displayEmptyState() {
   var container = document.getElementById("mainContent");
   if (!container) return;
-  container.innerHTML = "<div class=\\"content-card\\"><div class=\\"empty-state\\">✨ 暂无文章<br><br><button onclick=\\"showPublish()\\">发布第一篇文章</button></div></div>";
+  container.innerHTML = "<div class=\'content-card\'><div class=\'empty-state\'>✨ 暂无文章<br><br><button onclick=\'showPublish()\'>发布第一篇文章</button></div></div>";
 }
 
 function updateNav() {
@@ -917,7 +917,7 @@ function logout() {
 
 function showLogin() {
   var container = document.getElementById("mainContent");
-  container.innerHTML = "<div class=\\"content-card\\"><h2>登录后台</h2><div style=\\"margin-top:20px\\"><input id=loginUser type=text placeholder=用户名 style=\\"width:100%;padding:10px;margin-bottom:12px;border:1px solid #dee2e6;border-radius:6px\\"><br><input id=loginPass type=password placeholder=密码 style=\\"width:100%;padding:10px;margin-bottom:20px;border:1px solid #dee2e6;border-radius:6px\\"><br><button onclick=\\"doLogin()\\" style=\\"width:100%\\">登录</button></div></div>";
+  container.innerHTML = "<div class=\'content-card\'><h2>登录后台</h2><div style=\'margin-top:20px\'><input id=loginUser type=text placeholder=用户名 style=\'width:100%;padding:10px;margin-bottom:12px;border:1px solid #dee2e6;border-radius:6px\'><br><input id=loginPass type=password placeholder=密码 style=\'width:100%;padding:10px;margin-bottom:20px;border:1px solid #dee2e6;border-radius:6px\'><br><button onclick=\'doLogin()\' style=\'width:100%\'>登录</button></div></div>";
 }
 
 async function doLogin() {
@@ -942,7 +942,7 @@ function showPublish() {
   editId = null;
   currentImage = "";
   var container = document.getElementById("mainContent");
-  container.innerHTML = "<div class=\\"editor-container\\"><h2>发布文章</h2><div style=\\"margin-top:20px\\"><input id=title type=text placeholder=标题 class=\\"editor-title\\"><div style=\\"margin:12px 0\\"><label><input type=\\"checkbox\\" id=\\"postTop\\"> 设为置顶文章</label></div><div class=\\"toolbar\\"><button onclick=\\"formatText(\\"bold\\")\\">B</button><button onclick=\\"formatText(\\"italic\\")\\">I</button><button onclick=\\"formatText(\\"underline\\")\\">U</button><button onclick=\\"formatText(\\"h3\\")\\">H3</button><button onclick=\\"insertLink()\\">🔗链接</button><button onclick=\\"insertImage()\\">🖼️图片</button></div><textarea id=contentText class=\\"editor-content\\" placeholder=内容></textarea><div class=\\"upload-area\\"><input type=file id=imgFile accept=image/*><button onclick=\\"uploadImg()\\">上传封面</button></div><div id=preview></div><div class=\\"action-buttons\\"><button onclick=\\"doPublish()\\">发布文章</button><button class=\\"btn-secondary\\" onclick=\\"loadFeaturedPost()\\">取消</button></div></div></div>";
+  container.innerHTML = "<div class=\'editor-container\'><h2>发布文章</h2><div style=\'margin-top:20px\'><input id=title type=text placeholder=标题 class=\'editor-title\'><div style=\'margin:12px 0\'><label><input type=\'checkbox\' id=\'postTop\'> 设为置顶文章</label></div><div class=\'toolbar\'><button onclick=\'formatText(\"bold\")\'>B</button><button onclick=\'formatText(\"italic\")\'>I</button><button onclick=\'formatText(\"underline\")\'>U</button><button onclick=\'formatText(\"h3\")\'>H3</button><button onclick=\'insertLink()\'>🔗链接</button><button onclick=\'insertImage()\'>🖼️图片</button></div><textarea id=contentText class=\'editor-content\' placeholder=内容></textarea><div class=\'upload-area\'><input type=file id=imgFile accept=image/*><button onclick=\'uploadImg()\'>上传封面</button></div><div id=preview></div><div class=\'action-buttons\'><button onclick=\'doPublish()\'>发布文章</button><button class=\'btn-secondary\' onclick=\'loadFeaturedPost()\'>取消</button></div></div></div>";
 }
 
 async function uploadImg() {
@@ -955,7 +955,7 @@ async function uploadImg() {
     var data = await res.json();
     if(data.success){
       currentImage = data.url;
-      document.getElementById("preview").innerHTML = "<img src=\\""+data.url+"\\" class=\\"preview-img\\"><br><button onclick=\\"removeImg()\\">移除图片</button>";
+      document.getElementById("preview").innerHTML = "<img src=\'" + data.url + "\' class=\'preview-img\'><br><button onclick=\'removeImg()\'>移除图片</button>";
       alert("图片上传成功");
     } else { alert("上传失败"); }
   } catch(e){ alert("上传失败"); }
@@ -985,8 +985,8 @@ async function editPost(id) {
     editId = id;
     currentImage = p.img || "";
     var container = document.getElementById("mainContent");
-    container.innerHTML = "<div class=\\"editor-container\\"><h2>编辑文章</h2><div style=\\"margin-top:20px\\"><input id=title type=text placeholder=标题 class=\\"editor-title\\" value=\\""+escapeHtml(p.title)+"\\"><div style=\\"margin:12px 0\\"><label><input type=\\"checkbox\\" id=\\"postTop\\" "+(p.top?"checked":"")+"> 设为置顶文章</label></div><div class=\\"toolbar\\"><button onclick=\\"formatText(\\"bold\\")\\">B</button><button onclick=\\"formatText(\\"italic\\")\\">I</button><button onclick=\\"formatText(\\"underline\\")\\">U</button><button onclick=\\"formatText(\\"h3\\")\\">H3</button><button onclick=\\"insertLink()\\">🔗链接</button><button onclick=\\"insertImage()\\">🖼️图片</button></div><textarea id=contentText class=\\"editor-content\\" placeholder=内容>"+escapeHtml(p.content)+"</textarea><div class=\\"upload-area\\"><input type=file id=imgFile accept=image/*><button onclick=\\"uploadImg()\\">上传封面</button></div><div id=preview></div><div class=\\"action-buttons\\"><button onclick=\\"doUpdate()\\">更新文章</button><button class=\\"btn-secondary\\" onclick=\\"loadFeaturedPost()\\">取消</button></div></div></div>";
-    if(currentImage){ document.getElementById("preview").innerHTML = "<img src=\\""+currentImage+"\\" class=\\"preview-img\\"><br><button onclick=\\"removeImg()\\">移除图片</button>"; }
+    container.innerHTML = "<div class=\'editor-container\'><h2>编辑文章</h2><div style=\'margin-top:20px\'><input id=title type=text placeholder=标题 class=\'editor-title\' value=\'" + escapeHtml(p.title) + "\'><div style=\'margin:12px 0\'><label><input type=\'checkbox\' id=\'postTop\' " + (p.top ? "checked" : "") + "> 设为置顶文章</label></div><div class=\'toolbar\'><button onclick=\'formatText(\"bold\")\'>B</button><button onclick=\'formatText(\"italic\")\'>I</button><button onclick=\'formatText(\"underline\")\'>U</button><button onclick=\'formatText(\"h3\")\'>H3</button><button onclick=\'insertLink()\'>🔗链接</button><button onclick=\'insertImage()\'>🖼️图片</button></div><textarea id=contentText class=\'editor-content\' placeholder=内容>" + escapeHtml(p.content) + "</textarea><div class=\'upload-area\'><input type=file id=imgFile accept=image/*><button onclick=\'uploadImg()\'>上传封面</button></div><div id=preview></div><div class=\'action-buttons\'><button onclick=\'doUpdate()\'>更新文章</button><button class=\'btn-secondary\' onclick=\'loadFeaturedPost()\'>取消</button></div></div></div>";
+    if(currentImage){ document.getElementById("preview").innerHTML = "<img src=\'" + currentImage + "\' class=\'preview-img\'><br><button onclick=\'removeImg()\'>移除图片</button>"; }
   } catch(e){ alert("加载失败"); }
 }
 
@@ -1016,16 +1016,16 @@ function showManage() {
   var token = localStorage.getItem("token");
   if(!token){ showLogin(); return; }
   var container = document.getElementById("mainContent");
-  var logoHtml = currentLogoUrl ? "<img src=\\""+currentLogoUrl+"?v="+logoVersion+"\\" style=\\"width:80px;height:80px;border-radius:50%;object-fit:cover\\">" : "<div style=\\"width:80px;height:80px;border-radius:50%;background:#f1f3f5;display:flex;align-items:center;justify-content:center;font-size:40px\\">📷</div>";
-  container.innerHTML = "<div class=\\"content-card\\"><h2>管理后台</h2>" +
-    "<div style=\\"margin-bottom:30px;padding:20px;background:#f8f9fa;border-radius:12px\\">" +
+  var logoHtml = currentLogoUrl ? "<img src=\'" + currentLogoUrl + "?v=" + logoVersion + "\' style=\'width:80px;height:80px;border-radius:50%;object-fit:cover\'>" : "<div style=\'width:80px;height:80px;border-radius:50%;background:#f1f3f5;display:flex;align-items:center;justify-content:center;font-size:40px\'>📷</div>";
+  container.innerHTML = "<div class=\'content-card\'><h2>管理后台</h2>" +
+    "<div style=\'margin-bottom:30px;padding:20px;background:#f8f9fa;border-radius:12px\'>" +
     "<h3>🖼️ Logo设置</h3>" +
-    "<div style=\\"display:flex;align-items:center;gap:20px;margin:16px 0\\">" + logoHtml + "</div>" +
-    "<button onclick=\\"document.getElementById(\\"logoUpload\\").click()\\">更换Logo</button>" +
-    (currentLogoUrl ? "<button class=\\"btn-danger\\" style=\\"margin-left:10px\\" onclick=\\"deleteLogo()\\">恢复默认</button>" : "") +
-    "<input type=file id=logoUpload accept=\\"image/*\\" style=\\"display:none\\" onchange=\\"uploadLogoFile(this.files[0])\\">" +
+    "<div style=\'display:flex;align-items:center;gap:20px;margin:16px 0\'>" + logoHtml + "</div>" +
+    "<button onclick=\'document.getElementById(\"logoUpload\").click()\'>更换Logo</button>" +
+    (currentLogoUrl ? "<button class=\'btn-danger\' style=\'margin-left:10px\' onclick=\'deleteLogo()\'>恢复默认</button>" : "") +
+    "<input type=file id=logoUpload accept=\'image/*\' style=\'display:none\' onchange=\'uploadLogoFile(this.files[0])\'>" +
     "</div>" +
-    "<div style=\\"margin-bottom:30px\\"><h3>🔗 快捷按钮管理</h3><button onclick=\\"openButtonsModal()\\">管理10个快捷按钮</button></div>" +
+    "<div style=\'margin-bottom:30px\'><h3>🔗 快捷按钮管理</h3><button onclick=\'openButtonsModal()\'>管理10个快捷按钮</button></div>" +
     "<div><h3>📝 文章列表</h3><div id=managePosts></div></div></div>";
   renderManagePosts();
 }
@@ -1037,10 +1037,10 @@ async function renderManagePosts() {
   var html = "";
   for (var i = 0; i < allPosts.length; i++) {
     var p = allPosts[i];
-    var topTag = p.top ? " <span style='color:#ff6b6b'>[置顶]</span>" : "";
-    html += "<div style=\\"border:1px solid #e9ecef;border-radius:8px;padding:12px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center\\">" +
-      "<div><strong>" + escapeHtml(p.title) + "</strong>"+topTag+"<br><small>" + new Date(p.time).toLocaleDateString() + "</small></div>" +
-      "<div><button class=\\"btn-secondary\\" style=\\"margin-right:8px\\" onclick=\\"editPost('" + p.id + "')\\">编辑</button><button class=\\"btn-danger\\" onclick=\\"deletePost('" + p.id + "')\\">删除</button></div></div>";
+    var topTag = p.top ? " <span style=\'color:#ff6b6b\'>[置顶]</span>" : "";
+    html += "<div style=\'border:1px solid #e9ecef;border-radius:8px;padding:12px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center\'>" +
+      "<div><strong>" + escapeHtml(p.title) + "</strong>" + topTag + "<br><small>" + new Date(p.time).toLocaleDateString() + "</small></div>" +
+      "<div><button class=\'btn-secondary\' style=\'margin-right:8px\' onclick=\'editPost(\'" + p.id + "\')\'>编辑</button><button class=\'btn-danger\' onclick=\'deletePost(\'" + p.id + "\')\'>删除</button></div></div>";
   }
   container.innerHTML = html;
 }
@@ -1073,10 +1073,10 @@ function openButtonsModal() {
   var html = "";
   for (var i = 0; i < quickButtons.length; i++) {
     var btn = quickButtons[i];
-    html += "<div class=\\"btn-item\\">" +
-      "<input type=\\"text\\" placeholder=\\"按钮名称\\" value=\\"" + escapeHtml(btn.name) + "\\" id=\\"btn_name_" + i + "\\">" +
-      "<input type=\\"text\\" placeholder=\\"链接地址\\" value=\\"" + escapeHtml(btn.url) + "\\" id=\\"btn_url_" + i + "\\">" +
-      "<label><input type=\\"checkbox\\" id=\\"btn_enabled_" + i + "\\"" + (btn.enabled !== false ? " checked" : "") + "> 启用</label>" +
+    html += "<div class=\'btn-item\'>" +
+      "<input type=\'text\' placeholder=\'按钮名称\' value=\'" + escapeHtml(btn.name) + "\' id=\'btn_name_" + i + "\'>" +
+      "<input type=\'text\' placeholder=\'链接地址\' value=\'" + escapeHtml(btn.url) + "\' id=\'btn_url_" + i + "\'>" +
+      "<label><input type=\'checkbox\' id=\'btn_enabled_" + i + "\'" + (btn.enabled !== false ? " checked" : "") + "> 启用</label>" +
       "</div>";
   }
   container.innerHTML = html;
@@ -1117,8 +1117,8 @@ function insertLink() {
   if(url && url!="https://"){
     var text = selected;
     if(!text){ text = prompt("请输入链接文字:",url); if(!text) return; }
-    var html = "<a href=\\""+url+"\\" target=\\"_blank\\" rel=\\"noopener noreferrer\\">"+text+"</a>";
-    var newVal = ta.value.substring(0,start)+html+ta.value.substring(end);
+    var html = "<a href=\'" + url + "\' target=\'_blank\' rel=\'noopener noreferrer\'>" + text + "</a>";
+    var newVal = ta.value.substring(0,start) + html + ta.value.substring(end);
     ta.value = newVal;
     ta.focus();
   }
@@ -1129,9 +1129,9 @@ function insertImage() {
   if(!ta){ alert("请先输入内容"); return; }
   var url = prompt("请输入图片地址:","https://");
   if(url && url!="https://"){
-    var html = "<img src=\\""+url+"\\" style=\\"max-width:100%;margin:10px 0\\" alt=\\"图片\\">";
+    var html = "<img src=\'" + url + "\' style=\'max-width:100%;margin:10px 0\' alt=\'图片\'>";
     var start = ta.selectionStart;
-    var newVal = ta.value.substring(0,start)+html+ta.value.substring(start);
+    var newVal = ta.value.substring(0,start) + html + ta.value.substring(start);
     ta.value = newVal;
     ta.focus();
   }
@@ -1144,12 +1144,12 @@ function formatText(tag) {
   var end = ta.selectionEnd;
   var selected = ta.value.substring(start,end);
   var formatted = "";
-  if(tag==="bold") formatted = "<strong>"+selected+"</strong>";
-  else if(tag==="italic") formatted = "<em>"+selected+"</em>";
-  else if(tag==="underline") formatted = "<u>"+selected+"</u>";
-  else if(tag==="h3") formatted = "<h3>"+selected+"</h3>";
+  if(tag==="bold") formatted = "<strong>" + selected + "</strong>";
+  else if(tag==="italic") formatted = "<em>" + selected + "</em>";
+  else if(tag==="underline") formatted = "<u>" + selected + "</u>";
+  else if(tag==="h3") formatted = "<h3>" + selected + "</h3>";
   if(formatted){
-    var newVal = ta.value.substring(0,start)+formatted+ta.value.substring(end);
+    var newVal = ta.value.substring(0,start) + formatted + ta.value.substring(end);
     ta.value = newVal;
     ta.focus();
   }
