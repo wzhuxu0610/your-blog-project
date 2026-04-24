@@ -1,5 +1,7 @@
 #  完整部署步骤 - Cloudflare Pages 博客系统
 
+https://your-blog-project-4zs.pages.dev/
+
 ## 准备工作
 
 Cloudflare 账号
