@@ -1,0 +1,12 @@
+{
+  "name": "my-blog",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "edgeone pages dev",
+    "deploy": "edgeone pages deploy"
+  },
+  "devDependencies": {
+    "edgeone": "^1.3.4"
+  }
+}
