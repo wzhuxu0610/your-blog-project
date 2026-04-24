@@ -1,12 +1,14 @@
-// /functions/[[route]].js - 可在管理页修改快捷按钮 + 默认10个按钮
+// /functions/[[route]].js - 修复快捷按钮+置顶功能完整版
+
+// ========== 修改这里的用户名和密码 ==========
 const USERNAME = "admin";
 const PASSWORD = "ww123456";
+// =========================================
 
 const LOGO_KV_KEY = "site_logo_info";
 const BUTTONS_KV_KEY = "quick_buttons";
 const PINNED_KEY = "pinned_post_id";
 
-// 初始默认按钮（重置/首次访问时使用）
 const DEFAULT_BUTTONS = [
   { name: "百度", url: "https://www.baidu.com", enabled: true },
   { name: "谷歌", url: "https://www.google.com", enabled: true },
@@ -35,7 +37,6 @@ function getFullUrl(request) {
   return url;
 }
 
-// ---------- Logo ----------
 async function handleGetLogo(env) {
   try {
     if (!env.BLOG_KV) return new Response(JSON.stringify({ success: false, url: "" }), { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
@@ -93,7 +94,6 @@ async function handleDeleteLogo(request, env) {
   }
 }
 
-// ---------- 登录 ----------
 async function handleLogin(request) {
   try {
     const { username, password } = await request.json();
@@ -107,7 +107,6 @@ async function handleLogin(request) {
   }
 }
 
-// ---------- 上传图片 ----------
 async function handleUploadImage(request, env) {
   const auth = request.headers.get("Authorization");
   const token = auth?.replace("Bearer ", "");
@@ -128,19 +127,18 @@ async function handleUploadImage(request, env) {
   }
 }
 
-// ---------- 快捷按钮（核心修改） ----------
 async function handleGetButtons(env) {
   try {
-    const raw = await env.BLOG_KV.get(BUTTONS_KV_KEY);
-    // 有就返回保存的，没有返回默认
-    const buttons = raw ? JSON.parse(raw) : DEFAULT_BUTTONS;
-    return new Response(JSON.stringify(buttons), {
-      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-    });
+    if (!env.BLOG_KV) {
+      return new Response(JSON.stringify(DEFAULT_BUTTONS), { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
+    }
+    const buttonsData = await env.BLOG_KV.get(BUTTONS_KV_KEY);
+    if (!buttonsData) {
+      return new Response(JSON.stringify(DEFAULT_BUTTONS), { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
+    }
+    return new Response(buttonsData, { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
   } catch (e) {
-    return new Response(JSON.stringify(DEFAULT_BUTTONS), {
-      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-    });
+    return new Response(JSON.stringify(DEFAULT_BUTTONS), { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
   }
 }
 
@@ -150,7 +148,6 @@ async function handleSaveButtons(request, env) {
   if (!token || !verifyToken(token)) return new Response(JSON.stringify({ success: false, message: "请先登录" }), { status: 401, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
   try {
     const buttons = await request.json();
-    // 保存用户修改后的
     await env.BLOG_KV.put(BUTTONS_KV_KEY, JSON.stringify(buttons));
     return new Response(JSON.stringify({ success: true }), { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
   } catch (e) {
@@ -158,20 +155,6 @@ async function handleSaveButtons(request, env) {
   }
 }
 
-// 恢复默认按钮（管理页调用）
-async function handleResetButtons(request, env) {
-  const auth = request.headers.get("Authorization");
-  const token = auth?.replace("Bearer ", "");
-  if (!token || !verifyToken(token)) return new Response(JSON.stringify({ success: false, message: "请先登录" }), { status: 401, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
-  try {
-    await env.BLOG_KV.delete(BUTTONS_KV_KEY);
-    return new Response(JSON.stringify({ success: true, buttons: DEFAULT_BUTTONS }), { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
-  } catch (e) {
-    return new Response(JSON.stringify({ success: false, message: e.message }), { status: 500, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
-  }
-}
-
-// ---------- 文章 ----------
 async function handleGetBlogs(env) {
   try {
     if (!env || !env.BLOG_KV) return new Response(JSON.stringify({ list: [], error: "KV绑定不存在" }), { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
@@ -337,7 +320,6 @@ export async function onRequest(context) {
   if (method === "OPTIONS") return handleOptions();
   if (method === "GET" && path === "/api/buttons") return handleGetButtons(env);
   if (method === "POST" && path === "/api/buttons") return handleSaveButtons(request, env);
-  if (method === "POST" && path === "/api/buttons/reset") return handleResetButtons(request, env);
   if (method === "GET" && path === "/api/featured") return handleGetFeaturedPost(env);
   if (method === "GET" && path === "/api/logo") return handleGetLogo(env);
   if (method === "POST" && path === "/api/logo/upload") return handleUploadLogo(request, env);
@@ -407,9 +389,8 @@ button:hover{background:#1c7ed6}
 .btn-secondary{background:#adb5bd}
 .btn-danger{background:#fa5252}
 .btn-pin{background:#ff922b}
-.btn-reset{background:#ff7800}
 .hidden{display:none}
-.modal{position:fixed;top=0;left=0;right=0;bottom=0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:1000}
+.modal{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:1000}
 .modal.hidden{display:none}
 .modal-content{background:white;border-radius:12px;width:90%;max-width:600px;max-height:80vh;overflow-y:auto;padding:24px}
 .modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
@@ -461,10 +442,7 @@ button:hover{background:#1c7ed6}
       <button onclick="closeButtonsModal()" style="padding:6px 12px">关闭</button>
     </div>
     <div id="buttonsList"></div>
-    <div style="display:flex;gap:12px;margin-top:20px">
-      <button onclick="saveButtons()" style="flex:1">保存设置</button>
-      <button onclick="resetButtons()" class="btn-reset" style="flex:1">恢复默认</button>
-    </div>
+    <button onclick="saveButtons()" style="width:100%;margin-top:20px">保存设置</button>
   </div>
 </div>
 <script>
@@ -512,10 +490,40 @@ function updateLogoDisplay(url) {
 async function loadQuickButtons() {
   try {
     var res = await fetch("/api/buttons");
-    quickButtons = await res.json() || [];
+    if (res.ok) {
+      quickButtons = await res.json();
+    }
+    // 确保quickButtons是数组且有数据
+    if (!quickButtons || !Array.isArray(quickButtons) || quickButtons.length === 0) {
+      quickButtons = [
+        { name: "百度", url: "https://www.baidu.com", enabled: true },
+        { name: "谷歌", url: "https://www.google.com", enabled: true },
+        { name: "GitHub", url: "https://github.com", enabled: true },
+        { name: "淘宝", url: "https://www.taobao.com", enabled: true },
+        { name: "京东", url: "https://www.jd.com", enabled: true },
+        { name: "哔哩哔哩", url: "https://www.bilibili.com", enabled: true },
+        { name: "知乎", url: "https://www.zhihu.com", enabled: true },
+        { name: "微博", url: "https://weibo.com", enabled: true },
+        { name: "抖音", url: "https://www.douyin.com", enabled: true },
+        { name: "网易云音乐", url: "https://music.163.com", enabled: true }
+      ];
+    }
     renderQuickButtons();
   } catch(e) {
     console.error("加载按钮失败:", e);
+    quickButtons = [
+      { name: "百度", url: "https://www.baidu.com", enabled: true },
+      { name: "谷歌", url: "https://www.google.com", enabled: true },
+      { name: "GitHub", url: "https://github.com", enabled: true },
+      { name: "淘宝", url: "https://www.taobao.com", enabled: true },
+      { name: "京东", url: "https://www.jd.com", enabled: true },
+      { name: "哔哩哔哩", url: "https://www.bilibili.com", enabled: true },
+      { name: "知乎", url: "https://www.zhihu.com", enabled: true },
+      { name: "微博", url: "https://weibo.com", enabled: true },
+      { name: "抖音", url: "https://www.douyin.com", enabled: true },
+      { name: "网易云音乐", url: "https://music.163.com", enabled: true }
+    ];
+    renderQuickButtons();
   }
 }
 
@@ -523,10 +531,14 @@ function renderQuickButtons() {
   var container = document.getElementById("quickButtonsGrid");
   if (!container) return;
   var html = "";
-  for (var i = 0; i < quickButtons.length; i++) {
-    var btn = quickButtons[i];
-    if (btn.enabled !== false) {
-      html += "<a href=\\"" + escapeHtml(btn.url) + "\\" class=\\"quick-btn\\" target=\\"_blank\\" rel=\\"noopener noreferrer\\">" + escapeHtml(btn.name) + "</a>";
+  if (!quickButtons || quickButtons.length === 0) {
+    html = '<div style="grid-column: span 2;text-align:center;color:#adb5bd">暂无快捷链接</div>';
+  } else {
+    for (var i = 0; i < quickButtons.length; i++) {
+      var btn = quickButtons[i];
+      if (btn && btn.enabled !== false && btn.url && btn.name) {
+        html += '<a href="' + escapeHtml(btn.url) + '" class="quick-btn" target="_blank" rel="noopener noreferrer">' + escapeHtml(btn.name) + '</a>';
+      }
     }
   }
   container.innerHTML = html;
@@ -547,7 +559,7 @@ function renderArticlesList() {
   var container = document.getElementById("articlesList");
   if (!container) return;
   if (allPosts.length === 0) {
-    container.innerHTML = "<div style=\\"text-align:center;color:#adb5bd;padding:20px\\">暂无文章</div>";
+    container.innerHTML = '<div style="text-align:center;color:#adb5bd;padding:20px">暂无文章</div>';
     return;
   }
   var html = "";
@@ -555,10 +567,10 @@ function renderArticlesList() {
     var post = allPosts[i];
     var activeClass = (currentPostId === post.id) ? "active" : "";
     var pinMark = post.isPinned ? "<span class='article-pin'>置顶</span>" : "";
-    html += "<div class=\\"article-item " + activeClass + "\\" onclick=\\"loadPost('" + post.id + "')\\">" +
-      "<div class=\\"article-title\\">" + escapeHtml(post.title) + pinMark + "</div>" +
-      "<div class=\\"article-time\\">" + new Date(post.time).toLocaleDateString() + "</div>" +
-      "</div>";
+    html += '<div class="article-item ' + activeClass + '" onclick="loadPost(\'' + post.id + '\')">' +
+      '<div class="article-title">' + escapeHtml(post.title) + pinMark + '</div>' +
+      '<div class="article-time">' + new Date(post.time).toLocaleDateString() + '</div>' +
+      '</div>';
   }
   container.innerHTML = html;
 }
@@ -602,19 +614,19 @@ function displayPost(post) {
   var token = localStorage.getItem("token");
   var editHtml = "";
   if (token && post.id) {
-    editHtml = "<div style=\\"margin-top:30px;display:flex;gap:12px\\">" +
-      "<button class=\\"btn-secondary\\" onclick=\\"editPost('" + post.id + "')\\">编辑文章</button>" +
-      "<button class=\\"btn-danger\\" onclick=\\"deletePost('" + post.id + "')\\">删除文章</button>" +
-      "<button class=\\"btn-pin\\" onclick=\\"togglePin('" + post.id + "')\\">" + (allPosts.find(p=>p.id===post.id)?.isPinned ? "取消置顶" : "置顶文章") + "</button>" +
-      "</div>";
+    editHtml = '<div style="margin-top:30px;display:flex;gap:12px">' +
+      '<button class="btn-secondary" onclick="editPost(\'' + post.id + '\')">编辑文章</button>' +
+      '<button class="btn-danger" onclick="deletePost(\'' + post.id + '\')">删除文章</button>' +
+      '<button class="btn-pin" onclick="togglePin(\'' + post.id + '\')">' + (allPosts.find(p=>p.id===post.id)?.isPinned ? "取消置顶" : "置顶文章") + '</button>' +
+      '</div>';
   }
-  var html = "<div class=\\"content-card\\">" +
-    "<h1 class=\\"post-title\\">" + escapeHtml(post.title || "无标题") + "</h1>" +
-    "<div class=\\"post-meta\\">发布时间：" + (post.time ? new Date(post.time).toLocaleString() : "未知") + "</div>" +
-    (post.img ? "<img src=\\"" + post.img + "\\" class=\\"post-img\\" alt=\\"封面\\">" : "") +
-    "<div class=\\"post-content\\">" + (post.content ? post.content.replace(/\\n/g, "<br>") : "") + "</div>" +
+  var html = '<div class="content-card">' +
+    '<h1 class="post-title">' + escapeHtml(post.title || "无标题") + '</h1>' +
+    '<div class="post-meta">发布时间：' + (post.time ? new Date(post.time).toLocaleString() : "未知") + '</div>' +
+    (post.img ? '<img src="' + post.img + '" class="post-img" alt="封面">' : "") +
+    '<div class="post-content">' + (post.content ? post.content.replace(/\\n/g, "<br>") : "") + '</div>' +
     editHtml +
-    "</div>";
+    '</div>';
   container.innerHTML = html;
 }
 
@@ -628,7 +640,7 @@ async function togglePin(id) {
         "Content-Type": "application/json",
         "Authorization": "Bearer " + token
       },
-      body: JSON.stringify({ id })
+      body: JSON.stringify({ id: id })
     });
     var data = await res.json();
     if (data.success) {
@@ -646,7 +658,7 @@ async function togglePin(id) {
 function displayEmptyState() {
   var container = document.getElementById("mainContent");
   if (!container) return;
-  container.innerHTML = "<div class=\\"content-card\\"><div class=\\"empty-state\\">✨ 暂无文章<br><br><button onclick=\\"showPublish()\\">发布第一篇文章</button></div></div>";
+  container.innerHTML = '<div class="content-card"><div class="empty-state">✨ 暂无文章<br><br><button onclick="showPublish()">发布第一篇文章</button></div></div>';
 }
 
 function updateNav() {
@@ -675,7 +687,7 @@ function logout() {
 
 function showLogin() {
   var container = document.getElementById("mainContent");
-  container.innerHTML = "<div class=\\"content-card\\"><h2>登录后台</h2><div style=\\"margin-top:20px\\"><input id=loginUser type=text placeholder=用户名 style=\\"width:100%;padding:10px;margin-bottom:12px;border:1px solid #dee2e6;border-radius:6px\\"><br><input id=loginPass type=password placeholder=密码 style=\\"width:100%;padding:10px;margin-bottom:20px;border:1px solid #dee2e6;border-radius:6px\\"><br><button onclick=\\"doLogin()\\" style=\\"width:100%\\">登录</button></div></div>";
+  container.innerHTML = '<div class="content-card"><h2>登录后台</h2><div style="margin-top:20px"><input id=loginUser type=text placeholder=用户名 style="width:100%;padding:10px;margin-bottom:12px;border:1px solid #dee2e6;border-radius:6px"><br><input id=loginPass type=password placeholder=密码 style="width:100%;padding:10px;margin-bottom:20px;border:1px solid #dee2e6;border-radius:6px"><br><button onclick="doLogin()" style="width:100%">登录</button></div></div>';
 }
 
 async function doLogin() {
@@ -700,7 +712,7 @@ function showPublish() {
   editId = null;
   currentImage = "";
   var container = document.getElementById("mainContent");
-  container.innerHTML = "<div class=\\"editor-container\\"><h2>发布文章</h2><div style=\\"margin-top:20px\\"><input id=title type=text placeholder=标题 class=\\"editor-title\\"><div class=\\"toolbar\\"><button onclick=\\"formatText(\\"bold\\")\\">B</button><button onclick=\\"formatText(\\"italic\\")\\">I</button><button onclick=\\"formatText(\\"underline\\")\\">U</button><button onclick=\\"formatText(\\"h3\\")\\">H3</button><button onclick=\\"insertLink()\\">🔗链接</button><button onclick=\\"insertImage()\\">🖼️图片</button></div><textarea id=contentText class=\\"editor-content\\" placeholder=内容></textarea><div class=\\"upload-area\\"><input type=file id=imgFile accept=image/*><button onclick=\\"uploadImg()\\">上传封面</button></div><div id=preview></div><div class=\\"action-buttons\\"><button onclick=\\"doPublish()\\">发布文章</button><button class=\\"btn-secondary\\" onclick=\\"loadFeaturedPost()\\">取消</button></div></div></div>";
+  container.innerHTML = '<div class="editor-container"><h2>发布文章</h2><div style="margin-top:20px"><input id=title type=text placeholder=标题 class="editor-title"><div class="toolbar"><button onclick="formatText(\'bold\')">B</button><button onclick="formatText(\'italic\')">I</button><button onclick="formatText(\'underline\')">U</button><button onclick="formatText(\'h3\')">H3</button><button onclick="insertLink()">🔗链接</button><button onclick="insertImage()">🖼️图片</button></div><textarea id=contentText class="editor-content" placeholder=内容></textarea><div class="upload-area"><input type=file id=imgFile accept=image/*><button onclick="uploadImg()">上传封面</button></div><div id=preview></div><div class="action-buttons"><button onclick="doPublish()">发布文章</button><button class="btn-secondary" onclick="loadFeaturedPost()">取消</button></div></div></div>';
 }
 
 async function uploadImg() {
@@ -713,7 +725,7 @@ async function uploadImg() {
     var data = await res.json();
     if(data.success){
       currentImage = data.url;
-      document.getElementById("preview").innerHTML = "<img src=\\""+data.url+"\\" class=\\"preview-img\\"><br><button onclick=\\"removeImg()\\">移除图片</button>";
+      document.getElementById("preview").innerHTML = '<img src="'+data.url+'" class="preview-img"><br><button onclick="removeImg()">移除图片</button>';
       alert("图片上传成功");
     } else { alert("上传失败"); }
   } catch(e){ alert("上传失败"); }
@@ -742,8 +754,8 @@ async function editPost(id) {
     editId = id;
     currentImage = p.img || "";
     var container = document.getElementById("mainContent");
-    container.innerHTML = "<div class=\\"editor-container\\"><h2>编辑文章</h2><div style=\\"margin-top:20px\\"><input id=title type=text placeholder=标题 class=\\"editor-title\\" value=\\""+escapeHtml(p.title)+"\\"><div class=\\"toolbar\\"><button onclick=\\"formatText(\\"bold\\")\\">B</button><button onclick=\\"formatText(\\"italic\\")\\">I</button><button onclick=\\"formatText(\\"underline\\")\\">U</button><button onclick=\\"formatText(\\"h3\\")\\">H3</button><button onclick=\\"insertLink()\\">🔗链接</button><button onclick=\\"insertImage()\\">🖼️图片</button></div><textarea id=contentText class=\\"editor-content\\" placeholder=内容>"+escapeHtml(p.content)+"</textarea><div class=\\"upload-area\\"><input type=file id=imgFile accept=image/*><button onclick=\\"uploadImg()\\">上传封面</button></div><div id=preview></div><div class=\\"action-buttons\\"><button onclick=\\"doUpdate()\\">更新文章</button><button class=\\"btn-secondary\\" onclick=\\"loadFeaturedPost()\\">取消</button></div></div></div>";
-    if(currentImage){ document.getElementById("preview").innerHTML = "<img src=\\""+currentImage+"\\" class=\\"preview-img\\"><br><button onclick=\\"removeImg()\\">移除图片</button>"; }
+    container.innerHTML = '<div class="editor-container"><h2>编辑文章</h2><div style="margin-top:20px"><input id=title type=text placeholder=标题 class="editor-title" value="'+escapeHtml(p.title)+'"><div class="toolbar"><button onclick="formatText(\'bold\')">B</button><button onclick="formatText(\'italic\')">I</button><button onclick="formatText(\'underline\')">U</button><button onclick="formatText(\'h3\')">H3</button><button onclick="insertLink()">🔗链接</button><button onclick="insertImage()">🖼️图片</button></div><textarea id=contentText class="editor-content" placeholder=内容>'+escapeHtml(p.content)+'</textarea><div class="upload-area"><input type=file id=imgFile accept=image/*><button onclick="uploadImg()">上传封面</button></div><div id=preview></div><div class="action-buttons"><button onclick="doUpdate()">更新文章</button><button class="btn-secondary" onclick="loadFeaturedPost()">取消</button></div></div></div>';
+    if(currentImage){ document.getElementById("preview").innerHTML = '<img src="'+currentImage+'" class="preview-img"><br><button onclick="removeImg()">移除图片</button>'; }
   } catch(e){ alert("加载失败"); }
 }
 
@@ -772,17 +784,17 @@ function showManage() {
   var token = localStorage.getItem("token");
   if(!token){ showLogin(); return; }
   var container = document.getElementById("mainContent");
-  var logoHtml = currentLogoUrl ? "<img src=\\""+currentLogoUrl+"?v="+logoVersion+"\\" style=\\"width:80px;height:80px;border-radius:50%;object-fit:cover\\">" : "<div style=\\"width:80px;height:80px;border-radius:50%;background:#f1f3f5;display:flex;align-items:center;justify-content:center;font-size:40px\\">📷</div>";
-  container.innerHTML = "<div class=\\"content-card\\"><h2>管理后台</h2>" +
-    "<div style=\\"margin-bottom:30px;padding:20px;background:#f8f9fa;border-radius:12px\\">" +
-    "<h3>🖼️ Logo设置</h3>" +
-    "<div style=\\"display:flex;align-items:center;gap:20px;margin:16px 0\\">" + logoHtml + "</div>" +
-    "<button onclick=\\"document.getElementById(\\"logoUpload\\").click()\\">更换Logo</button>" +
-    (currentLogoUrl ? "<button class=\\"btn-danger\\" style=\\"margin-left:10px\\" onclick=\\"deleteLogo()\\">恢复默认</button>" : "") +
-    "<input type=file id=logoUpload accept=\\"image/*\\" style=\\"display:none\\" onchange=\\"uploadLogoFile(this.files[0])\\">" +
-    "</div>" +
-    "<div style=\\"margin-bottom:30px\\"><h3>🔗 快捷按钮管理</h3><button onclick=\\"openButtonsModal()\\">管理10个快捷按钮</button></div>" +
-    "<div><h3>📝 文章列表</h3><div id=managePosts></div></div></div>";
+  var logoHtml = currentLogoUrl ? '<img src="'+currentLogoUrl+'?v='+logoVersion+'" style="width:80px;height:80px;border-radius:50%;object-fit:cover">' : '<div style="width:80px;height:80px;border-radius:50%;background:#f1f3f5;display:flex;align-items:center;justify-content:center;font-size:40px">📷</div>';
+  container.innerHTML = '<div class="content-card"><h2>管理后台</h2>' +
+    '<div style="margin-bottom:30px;padding:20px;background:#f8f9fa;border-radius:12px">' +
+    '<h3>🖼️ Logo设置</h3>' +
+    '<div style="display:flex;align-items:center;gap:20px;margin:16px 0">' + logoHtml + '</div>' +
+    '<button onclick="document.getElementById(\'logoUpload\').click()">更换Logo</button>' +
+    (currentLogoUrl ? '<button class="btn-danger" style="margin-left:10px" onclick="deleteLogo()">恢复默认</button>' : "") +
+    '<input type=file id=logoUpload accept="image/*" style="display:none" onchange="uploadLogoFile(this.files[0])">' +
+    '</div>' +
+    '<div style="margin-bottom:30px"><h3>🔗 快捷按钮管理</h3><button onclick="openButtonsModal()">管理10个快捷按钮</button></div>' +
+    '<div><h3>📝 文章列表</h3><div id=managePosts></div></div></div>';
   renderManagePosts();
 }
 
@@ -794,9 +806,9 @@ async function renderManagePosts() {
   for (var i = 0; i < allPosts.length; i++) {
     var p = allPosts[i];
     var pinText = p.isPinned ? "取消置顶" : "置顶";
-    html += "<div style=\\"border:1px solid #e9ecef;border-radius:8px;padding:12px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center\\">" +
-      "<div><strong>" + escapeHtml(p.title) + "</strong><br><small>" + new Date(p.time).toLocaleDateString() + "</small></div>" +
-      "<div><button class=\\"btn-secondary\\" style=\\"margin-right:8px\\" onclick=\\"editPost('" + p.id + "')\\">编辑</button><button class=\\"btn-pin\\" style=\\"margin-right:8px\\" onclick=\\"togglePin('" + p.id + "')\\">" + pinText + "</button><button class=\\"btn-danger\\" onclick=\\"deletePost('" + p.id + "')\\">删除</button></div></div>";
+    html += '<div style="border:1px solid #e9ecef;border-radius:8px;padding:12px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center">' +
+      '<div><strong>' + escapeHtml(p.title) + '</strong><br><small>' + new Date(p.time).toLocaleDateString() + '</small></div>' +
+      '<div><button class="btn-secondary" style="margin-right:8px" onclick="editPost(\'' + p.id + '\')">编辑</button><button class="btn-pin" style="margin-right:8px" onclick="togglePin(\'' + p.id + '\')">' + pinText + '</button><button class="btn-danger" onclick="deletePost(\'' + p.id + '\')">删除</button></div></div>';
   }
   container.innerHTML = html;
 }
@@ -829,11 +841,11 @@ function openButtonsModal() {
   var html = "";
   for (var i = 0; i < quickButtons.length; i++) {
     var btn = quickButtons[i];
-    html += "<div class=\\"btn-item\\">" +
-      "<input type=\\"text\\" placeholder=\\"按钮名称\\" value=\\"" + escapeHtml(btn.name) + "\\" id=\\"btn_name_" + i + "\\">" +
-      "<input type=\\"text\\" placeholder=\\"链接地址\\" value=\\"" + escapeHtml(btn.url) + "\\" id=\\"btn_url_" + i + "\\">" +
-      "<label><input type=\\"checkbox\\" id=\\"btn_enabled_" + i + "\\"" + (btn.enabled !== false ? " checked" : "") + "> 启用</label>" +
-      "</div>";
+    html += '<div class="btn-item">' +
+      '<input type="text" placeholder="按钮名称" value="' + escapeHtml(btn.name) + '" id="btn_name_' + i + '">' +
+      '<input type="text" placeholder="链接地址" value="' + escapeHtml(btn.url) + '" id="btn_url_' + i + '">' +
+      '<label><input type="checkbox" id="btn_enabled_' + i + '"' + (btn.enabled !== false ? " checked" : "") + '> 启用</label>' +
+      '</div>';
   }
   container.innerHTML = html;
   modal.classList.remove("hidden");
@@ -857,44 +869,10 @@ async function saveButtons() {
     });
   }
   try {
-    var res = await fetch("/api/buttons", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + localStorage.getItem("token") },
-      body: JSON.stringify(newButtons)
-    });
-    if (res.ok) {
-      alert("保存成功");
-      quickButtons = newButtons;
-      renderQuickButtons();
-      closeButtonsModal();
-    } else {
-      alert("保存失败");
-    }
-  } catch(e) {
-    alert("保存失败");
-  }
-}
-
-// 恢复默认按钮
-async function resetButtons() {
-  if (!confirm("确定恢复默认10个快捷按钮？")) return;
-  try {
-    var res = await fetch("/api/buttons/reset", {
-      method: "POST",
-      headers: { "Authorization": "Bearer " + localStorage.getItem("token") }
-    });
-    var data = await res.json();
-    if (data.success) {
-      alert("已恢复默认");
-      quickButtons = data.buttons;
-      renderQuickButtons();
-      openButtonsModal();
-    } else {
-      alert("恢复失败");
-    }
-  } catch(e) {
-    alert("恢复失败");
-  }
+    var res = await fetch("/api/buttons", {method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+localStorage.getItem("token")},body:JSON.stringify(newButtons)});
+    if (res.ok) { alert("保存成功"); await loadQuickButtons(); closeButtonsModal(); }
+    else { alert("保存失败"); }
+  } catch(e) { alert("保存失败"); }
 }
 
 function insertLink() {
@@ -907,7 +885,7 @@ function insertLink() {
   if(url && url!="https://"){
     var text = selected;
     if(!text){ text = prompt("请输入链接文字:",url); if(!text) return; }
-    var html = "<a href=\\""+url+"\\" target=\\"_blank\\" rel=\\"noopener noreferrer\\">"+text+"</a>";
+    var html = '<a href="'+url+'" target="_blank" rel="noopener noreferrer">'+text+'</a>';
     var newVal = ta.value.substring(0,start)+html+ta.value.substring(end);
     ta.value = newVal;
     ta.focus();
@@ -919,7 +897,7 @@ function insertImage() {
   if(!ta){ alert("请先输入内容"); return; }
   var url = prompt("请输入图片地址:","https://");
   if(url && url!="https://"){
-    var html = "<img src=\\""+url+"\\" style=\\"max-width:100%;margin:10px 0\\" alt=\\"图片\\">";
+    var html = '<img src="'+url+'" style="max-width:100%;margin:10px 0" alt="图片">';
     var start = ta.selectionStart;
     var newVal = ta.value.substring(0,start)+html+ta.value.substring(start);
     ta.value = newVal;
