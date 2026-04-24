@@ -7,7 +7,7 @@ export async function onRequest(context) {
 
   // ========== 账号密码 ==========
   const USERNAME = "admin";
-  const PASSWORD = "ww12356";
+  const PASSWORD = "ww123456";
   // ============================
 
   const LOGO_KV_KEY = "site_logo_info";
@@ -119,14 +119,10 @@ export async function onRequest(context) {
   }
 
   async function handleSaveButtons(request, env) {
-    // ============== 修复 401 核心 ==============
-    const authHeader = request.headers.get("Authorization") || "";
-    const token = authHeader.split(" ")[1] || "";
-    if (!verifyToken(token)) {
-      return new Response(JSON.stringify({ success: false }), { status: 401 });
-    }
-    // ==========================================
-
+    const auth = request.headers.get("Authorization");
+    const token = auth ? auth.replace("Bearer ", "") : "";
+    if (!verifyToken(token)) return new Response(JSON.stringify({ success: false }), { status: 401 });
+    
     const buttons = await request.json();
     await env.BLOG_KV.put(BUTTONS_KV_KEY, JSON.stringify(buttons));
     return new Response(JSON.stringify({ success: true }));
@@ -502,7 +498,7 @@ async function login(){
     updateNav();
     await loadPosts();
     await loadTop();
-  }else alert("失败");
+  }else alert("登录失败，请检查用户名和密码");
 }
 
 function showPublish(){
@@ -513,22 +509,22 @@ function showPublish(){
     '<input id="title" class="editor-title" placeholder="标题">'+
     '<div style="margin:12px 0"><label><input type="checkbox" id="top"> 设为置顶</label></div>'+
     '<div class="toolbar">'+
-      '<button onclick="fmt(\'bold\')">B</button>'+
-      '<button onclick="fmt(\'italic\')">I</button>'+
-      '<button onclick="fmt(\'underline\')">U</button>'+
-      '<button onclick="fmt(\'h3\')">H3</button>'+
-      '<button onclick="link()">🔗链接</button>'+
-      '<button onclick="img()">🖼️图片</button>'+
+      '<button type="button" onclick="fmt(\'bold\')">B</button>'+
+      '<button type="button" onclick="fmt(\'italic\')">I</button>'+
+      '<button type="button" onclick="fmt(\'underline\')">U</button>'+
+      '<button type="button" onclick="fmt(\'h3\')">H3</button>'+
+      '<button type="button" onclick="link()">🔗链接</button>'+
+      '<button type="button" onclick="img()">🖼️图片</button>'+
     '</div>'+
     '<textarea id="text" class="editor-text" placeholder="内容"></textarea>'+
     '<div style="margin:16px 0">'+
       '<input type="file" id="file" accept="image/*">'+
-      '<button onclick="upImg()">上传封面</button>'+
+      '<button type="button" onclick="upImg()">上传封面</button>'+
     '</div>'+
     '<div id="prev"></div>'+
     '<div class="action">'+
-      '<button onclick="pub()">发布</button>'+
-      '<button class="btn2" onclick="loadTop()">取消</button>'+
+      '<button type="button" onclick="pub()">发布</button>'+
+      '<button type="button" class="btn2" onclick="loadTop()">取消</button>'+
     '</div>'+
   '</div>';
 }
@@ -541,7 +537,9 @@ async function upImg(){
   const j=await r.json();
   if(j.success){
     currentImg=j.url;
-    document.getElementById("prev").innerHTML='<img src="'+j.url+'" style="max-width:200px;border-radius:8px"><br><button onclick="currentImg=\'\';document.getElementById(\'prev\').innerHTML=\'\'">移除</button>';
+    document.getElementById("prev").innerHTML='<img src="'+j.url+'" style="max-width:200px;border-radius:8px"><br><button type="button" onclick="currentImg=\'\';document.getElementById(\'prev\').innerHTML=\'\'">移除</button>';
+  } else {
+    alert("上传失败");
   }
 }
 
@@ -552,7 +550,8 @@ async function pub(){
   if(!t){alert("标题不能为空");return;}
   const r=await fetch("/api/blog",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+localStorage.getItem("token")},body:JSON.stringify({title:t,content:c,img:currentImg,top})});
   const d=await r.json();
-  if(d.success){alert("成功");await loadPosts();await loadTop();}
+  if(d.success){alert("发布成功");await loadPosts();await loadTop();}
+  else alert("发布失败");
 }
 
 async function edit(id){
@@ -565,25 +564,25 @@ async function edit(id){
     '<input id="title" class="editor-title" value="'+esc(p.title)+'">'+
     '<div style="margin:12px 0"><label><input type="checkbox" id="top" '+(p.top?"checked":"")+'> 设为置顶</label></div>'+
     '<div class="toolbar">'+
-      '<button onclick="fmt(\'bold\')">B</button>'+
-      '<button onclick="fmt(\'italic\')">I</button>'+
-      '<button onclick="fmt(\'underline\')">U</button>'+
-      '<button onclick="fmt(\'h3\')">H3</button>'+
-      '<button onclick="link()">🔗链接</button>'+
-      '<button onclick="img()">🖼️图片</button>'+
+      '<button type="button" onclick="fmt(\'bold\')">B</button>'+
+      '<button type="button" onclick="fmt(\'italic\')">I</button>'+
+      '<button type="button" onclick="fmt(\'underline\')">U</button>'+
+      '<button type="button" onclick="fmt(\'h3\')">H3</button>'+
+      '<button type="button" onclick="link()">🔗链接</button>'+
+      '<button type="button" onclick="img()">🖼️图片</button>'+
     '</div>'+
     '<textarea id="text" class="editor-text">'+esc(p.content)+'</textarea>'+
     '<div style="margin:16px 0">'+
       '<input type="file" id="file" accept="image/*">'+
-      '<button onclick="upImg()">上传封面</button>'+
+      '<button type="button" onclick="upImg()">上传封面</button>'+
     '</div>'+
     '<div id="prev"></div>'+
     '<div class="action">'+
-      '<button onclick="update()">保存</button>'+
-      '<button class="btn2" onclick="loadTop()">取消</button>'+
+      '<button type="button" onclick="update()">保存</button>'+
+      '<button type="button" class="btn2" onclick="loadTop()">取消</button>'+
     '</div>'+
   '</div>';
-  if(currentImg)document.getElementById("prev").innerHTML='<img src="'+currentImg+'" style="max-width:200px;border-radius:8px"><br><button onclick="currentImg=\'\';document.getElementById(\'prev\').innerHTML=\'\'">移除</button>';
+  if(currentImg)document.getElementById("prev").innerHTML='<img src="'+currentImg+'" style="max-width:200px;border-radius:8px"><br><button type="button" onclick="currentImg=\'\';document.getElementById(\'prev\').innerHTML=\'\'">移除</button>';
 }
 
 async function update(){
@@ -593,7 +592,8 @@ async function update(){
   if(!t){alert("标题不能为空");return;}
   const r=await fetch("/api/blog/"+editId,{method:"PUT",headers:{"Content-Type":"application/json","Authorization":"Bearer "+localStorage.getItem("token")},body:JSON.stringify({title:t,content:c,img:currentImg,top})});
   const d=await r.json();
-  if(d.success){alert("成功");await loadPosts();await loadTop();}
+  if(d.success){alert("保存成功");await loadPosts();await loadTop();}
+  else alert("保存失败");
 }
 
 async function del(id){
@@ -609,11 +609,11 @@ function showManage(){
     '<h2>管理</h2>'+
     '<div style="margin-bottom:30px;padding:20px;background:#f8f9fa;border-radius:12px">'+
       '<h3>Logo</h3>'+logo+'<br>'+
-      '<button onclick="document.getElementById(\'logoFile\').click()">更换</button>'+
-      (logoUrl?'<button class="btn-danger" style="margin-left:10px" onclick="delLogo()">恢复默认</button>':'')+
+      '<button type="button" onclick="document.getElementById(\'logoFile\').click()">更换</button>'+
+      (logoUrl?'<button type="button" class="btn-danger" style="margin-left:10px" onclick="delLogo()">恢复默认</button>':'')+
       '<input type="file" id="logoFile" accept="image/*" hidden onchange="upLogo(this.files[0])">'+
     '</div>'+
-    '<div style="margin-bottom:30px"><h3>快捷按钮</h3><button onclick="openModal()">设置</button></div>'+
+    '<div style="margin-bottom:30px"><h3>快捷按钮</h3><button type="button" onclick="openModal()">设置</button></div>'+
     '<div><h3>文章</h3><div id="managePosts"></div></div>'+
   '</div>';
   renderManagePosts();
@@ -637,7 +637,7 @@ function renderManagePosts(){
     const top=p.top?" <span style='color:#ff6b6b'>[置顶]</span>":"";
     h+='<div style="border:1px solid #e9ecef;border-radius:8px;padding:12px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center">'+
       '<div><strong>'+esc(p.title)+'</strong>'+top+'<br><small>'+new Date(p.time).toLocaleDateString()+'</small></div>'+
-      '<div><button class="btn2" onclick="edit(\''+p.id+'\')">编辑</button><button class="btn-danger" onclick="del(\''+p.id+'\')">删除</button></div>'+
+      '<div><button type="button" class="btn2" onclick="edit(\''+p.id+'\')">编辑</button><button type="button" class="btn-danger" onclick="del(\''+p.id+'\')">删除</button></div>'+
     '</div>';
   });
   o.innerHTML=h;
@@ -675,14 +675,7 @@ async function saveQuick(){
       });
     }
   });
-  await fetch("/api/buttons",{
-    method:"POST",
-    headers:{
-      "Content-Type":"application/json",
-      "Authorization":"Bearer "+localStorage.getItem("token")
-    },
-    body:JSON.stringify(arr)
-  });
+  await fetch("/api/buttons",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+localStorage.getItem("token")},body:JSON.stringify(arr)});
   closeModal();
   loadQuick();
 }
@@ -695,6 +688,7 @@ function link(){
   const u=prompt("链接：");
   if(!u)return;
   const txt=sel||prompt("文字：");
+  if(!txt) return;
   t.value=t.value.substring(0,s)+'<a href="'+u+'" target="_blank">'+txt+'</a>'+t.value.substring(e);
 }
 
