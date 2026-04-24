@@ -137,7 +137,8 @@ export async function onRequest(context) {
           const val = await env.BLOG_KV.get(key.name);
           if (val) {
             const p = JSON.parse(val);
-            list.push({ id: key.name, title: p.title, time: p.time, img: p.img || "", top: p.top || false });
+            // 前台不返回 top 字段，避免泄露置顶信息
+            list.push({ id: key.name, title: p.title, time: p.time, img: p.img || "" });
           }
         }
       }
@@ -156,9 +157,9 @@ export async function onRequest(context) {
           const val = await env.BLOG_KV.get(key.name);
           if (val) {
             const p = JSON.parse(val);
-            const item = { id: key.name, title: p.title, content: p.content || "", img: p.img || "", time: p.time, top: p.top || false };
+            const item = { id: key.name, title: p.title, content: p.content || "", img: p.img || "", time: p.time };
             all.push(item);
-            if (item.top) tops.push(item);
+            if (p.top) tops.push(item);
           }
         }
       }
@@ -173,7 +174,27 @@ export async function onRequest(context) {
     const val = await env.BLOG_KV.get(id);
     if (!val) return new Response(JSON.stringify({ error: "not found" }), { status: 404 });
     const p = JSON.parse(val);
-    return new Response(JSON.stringify({ id, title: p.title, content: p.content || "", img: p.img || "", time: p.time, top: p.top || false }));
+    // 前台不返回 top 字段
+    return new Response(JSON.stringify({ id, title: p.title, content: p.content || "", img: p.img || "", time: p.time }));
+  }
+
+  // 后台管理专用的获取文章列表（包含 top 字段）
+  async function handleGetBlogsAdmin(env) {
+    const list = [];
+    try {
+      const { keys } = await env.BLOG_KV.list();
+      for (const key of keys) {
+        if (/^\d+$/.test(key.name) && !key.name.startsWith("img_") && !key.name.startsWith("logo_")) {
+          const val = await env.BLOG_KV.get(key.name);
+          if (val) {
+            const p = JSON.parse(val);
+            list.push({ id: key.name, title: p.title, time: p.time, img: p.img || "", top: p.top || false });
+          }
+        }
+      }
+    } catch {}
+    list.sort((a, b) => b.time - a.time);
+    return new Response(JSON.stringify({ list }));
   }
 
   async function handleCreateBlog(request, env) {
@@ -254,7 +275,8 @@ export async function onRequest(context) {
   if (method === "GET" && path === "/api/buttons") return handleGetButtons(env);
   if (method === "POST" && path === "/api/buttons") return handleSaveButtons(request, env);
   if (method === "GET" && path === "/api/featured") return handleGetFeaturedPost(env);
-  if (method === "GET" && path === "/api/blog") return handleGetBlogs(env);
+  if (method === "GET" && path === "/api/blog") return handleGetBlogs(env);  // 前台用，不含top
+  if (method === "GET" && path === "/api/admin/blogs") return handleGetBlogsAdmin(env);  // 后台管理用，包含top
   if (method === "GET" && path.startsWith("/api/i/")) return handleGetImage(path.split("/api/i/")[1], env);
   if (method === "GET" && path.startsWith("/api/blog/")) return handleGetBlog(path.split("/")[3], env);
   if (method === "POST" && path === "/api/blog") return handleCreateBlog(request, env);
@@ -409,7 +431,7 @@ function renderQuick(){
 
 async function loadPosts(){
   try {
-    const r = await fetch("/api/blog");
+    const r = await fetch("/api/blog");  // 前台接口，不返回top字段
     const d = await r.json();
     posts = d.list || [];
     renderArtList();
@@ -426,9 +448,9 @@ function renderArtList(){
   let h = "";
   posts.forEach(p => {
     const act = currentId === p.id ? "active" : "";
-    const top = p.top ? " <span style='color:#ff6b6b'>[置顶]</span>" : "";
+    // 前台不显示置顶标记
     h += '<div class="art-item '+act+'" onclick="openPost(\''+p.id+'\')">' +
-      '<div class="art-title-text">'+esc(p.title)+top+'</div>' +
+      '<div class="art-title-text">'+esc(p.title)+'</div>' +
       '<div class="art-time">'+new Date(p.time).toLocaleDateString()+'</div>' +
     '</div>';
   });
@@ -469,9 +491,9 @@ function showPost(p){
     '<button class="btn2" onclick="edit(\''+p.id+'\')">编辑</button>' +
     '<button class="btn-danger" onclick="del(\''+p.id+'\')">删除</button>' +
   '</div>' : "";
-  const top = p.top ? " <span style='color:#ff6b6b'>[置顶]</span>" : "";
+  // 前台不显示置顶标记
   m.innerHTML = '<div class="card">' +
-    '<h1 class="post-title">'+esc(p.title||"无标题")+top+'</h1>' +
+    '<h1 class="post-title">'+esc(p.title||"无标题")+'</h1>' +
     '<div class="post-meta">'+new Date(p.time).toLocaleString()+'</div>' +
     (p.img ? '<img src="'+p.img+'" class="post-img">' : "") +
     '<div class="post-content">'+(p.content||"").replace(/\\n/g,"<br>")+'</div>' +
@@ -625,10 +647,16 @@ async function edit(id){
     currentImg = p.img || "";
     const m = document.getElementById("mainContent");
     if(!m) return;
+    // 编辑时需要获取文章的置顶状态，需要单独调用后台接口
+    const adminR = await fetch("/api/admin/blogs");
+    const adminD = await adminR.json();
+    const adminPost = adminD.list.find(item => item.id === id);
+    const isTop = adminPost ? adminPost.top : false;
+    
     m.innerHTML = '<div class="editor">' +
       '<h2>编辑</h2>' +
       '<input id="title" class="editor-title" value="'+esc(p.title)+'">' +
-      '<div style="margin:12px 0"><label><input type="checkbox" id="top" '+(p.top?"checked":"")+'> 设为置顶</label></div>' +
+      '<div style="margin:12px 0"><label><input type="checkbox" id="top" '+(isTop?"checked":"")+'> 设为置顶</label></div>' +
       '<div class="toolbar">' +
         '<button type="button" onclick="fmt(\'bold\')">B</button>' +
         '<button type="button" onclick="fmt(\'italic\')">I</button>' +
@@ -691,7 +719,7 @@ async function del(id){
   } catch(e) { alert("删除失败"); }
 }
 
-function showManage(){
+async function showManage(){
   if(!localStorage.getItem("token")){ showLogin(); return; }
   const logo = logoUrl ? '<img src="'+logoUrl+'" style="width:80px;height:80px;border-radius:50%">' : '<div style="width:80px;height:80px;background:#f1f3f5;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:40px">📷</div>';
   const m = document.getElementById("mainContent");
@@ -707,7 +735,7 @@ function showManage(){
     '<div style="margin-bottom:30px"><h3>快捷按钮</h3><button type="button" onclick="openModal()">设置</button></div>' +
     '<div><h3>文章</h3><div id="managePosts"></div></div>' +
   '</div>';
-  renderManagePosts();
+  await renderManagePosts();
 }
 
 async function upLogo(f){
@@ -734,11 +762,16 @@ async function delLogo(){
   } catch(e) { alert("删除失败"); }
 }
 
-function renderManagePosts(){
+async function renderManagePosts(){
   const o = document.getElementById("managePosts");
   if(!o) return;
+  // 后台管理使用专门的接口，包含top字段
+  const r = await fetch("/api/admin/blogs");
+  const d = await r.json();
+  const adminPosts = d.list || [];
   let h = "";
-  posts.forEach(p => {
+  adminPosts.forEach(p => {
+    // 后台显示置顶标记
     const top = p.top ? " <span style='color:#ff6b6b'>[置顶]</span>" : "";
     h += '<div style="border:1px solid #e9ecef;border-radius:8px;padding:12px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center">' +
       '<div><strong>'+esc(p.title)+'</strong>'+top+'<br><small>'+new Date(p.time).toLocaleDateString()+'</small></div>' +
