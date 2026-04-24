@@ -100,14 +100,14 @@ export async function onRequest(context) {
     if (!file) return new Response(JSON.stringify({ success: false }), { status: 400 });
     
     const buf = await file.arrayBuffer();
-    const key = "img_" + Date.now();
-    await env.BLOG_KV.put(key, buf, { metadata: { type: file.type } });
+    const key = "img_" + Date.now() + "_" + (file.name || "image");
+    await env.BLOG_KV.put(key, buf, { metadata: { type: file.type, name: file.name } });
     
     const host = request.headers.get("host");
     const proto = request.url.startsWith("https") ? "https" : "http";
     const url = proto + "://" + host + "/api/i/" + key;
     
-    return new Response(JSON.stringify({ success: true, url }));
+    return new Response(JSON.stringify({ success: true, url, key }));
   }
 
   async function handleGetButtons(env) {
@@ -137,7 +137,6 @@ export async function onRequest(context) {
           const val = await env.BLOG_KV.get(key.name);
           if (val) {
             const p = JSON.parse(val);
-            // 前台不返回 top 字段，避免泄露置顶信息
             list.push({ id: key.name, title: p.title, time: p.time, img: p.img || "" });
           }
         }
@@ -174,11 +173,9 @@ export async function onRequest(context) {
     const val = await env.BLOG_KV.get(id);
     if (!val) return new Response(JSON.stringify({ error: "not found" }), { status: 404 });
     const p = JSON.parse(val);
-    // 前台不返回 top 字段
     return new Response(JSON.stringify({ id, title: p.title, content: p.content || "", img: p.img || "", time: p.time }));
   }
 
-  // 后台管理专用的获取文章列表（包含 top 字段）
   async function handleGetBlogsAdmin(env) {
     const list = [];
     try {
@@ -275,8 +272,8 @@ export async function onRequest(context) {
   if (method === "GET" && path === "/api/buttons") return handleGetButtons(env);
   if (method === "POST" && path === "/api/buttons") return handleSaveButtons(request, env);
   if (method === "GET" && path === "/api/featured") return handleGetFeaturedPost(env);
-  if (method === "GET" && path === "/api/blog") return handleGetBlogs(env);  // 前台用，不含top
-  if (method === "GET" && path === "/api/admin/blogs") return handleGetBlogsAdmin(env);  // 后台管理用，包含top
+  if (method === "GET" && path === "/api/blog") return handleGetBlogs(env);
+  if (method === "GET" && path === "/api/admin/blogs") return handleGetBlogsAdmin(env);
   if (method === "GET" && path.startsWith("/api/i/")) return handleGetImage(path.split("/api/i/")[1], env);
   if (method === "GET" && path.startsWith("/api/blog/")) return handleGetBlog(path.split("/")[3], env);
   if (method === "POST" && path === "/api/blog") return handleCreateBlog(request, env);
@@ -324,11 +321,16 @@ body{background:#f5f7fa;font-family:-apple-system,BlinkMacSystemFont,Roboto,Aria
 .post-meta{color:#868e96;margin-bottom:24px;padding-bottom:16px;border-bottom:1px solid #e9ecef}
 .post-img{max-width:100%;border-radius:12px;margin:20px 0}
 .post-content{line-height:1.8;color:#495057}
+.post-content img{max-width:100%;height:auto;border-radius:8px;margin:10px 0}
+.post-content a{color:#228be6;text-decoration:none}
+.post-content a:hover{text-decoration:underline}
 .editor{background:#fff;border-radius:12px;padding:24px}
 .editor-title{width:100%;padding:12px;border:1px solid #dee2e6;border-radius:8px;font-size:20px;margin-bottom:16px}
-.toolbar{background:#f8f9fa;border:1px solid #dee2e6;border-radius:8px;padding:8px;display:flex;gap:6px;margin-bottom:12px}
-.toolbar button{padding:6px 12px;background:#e9ecef;border:none;border-radius:4px;cursor:pointer}
-.editor-text{width:100%;min-height:300px;padding:16px;border:1px solid #dee2e6;border-radius:8px;line-height:1.6;font-family:monospace}
+.toolbar{background:#f8f9fa;border:1px solid #dee2e6;border-radius:8px;padding:8px;display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.toolbar button{padding:6px 12px;background:#e9ecef;border:none;border-radius:4px;cursor:pointer;font-size:13px}
+.toolbar button:hover{background:#dee2e6}
+.divider{width:1px;height:24px;background:#dee2e6;margin:0 4px}
+.editor-text{width:100%;min-height:400px;padding:16px;border:1px solid #dee2e6;border-radius:8px;line-height:1.6;font-family:monospace;font-size:14px}
 .action{display:flex;gap:12px;margin-top:20px}
 button{padding:10px 20px;background:#228be6;color:#fff;border:none;border-radius:6px;cursor:pointer}
 .btn2{background:#adb5bd}
@@ -338,6 +340,14 @@ button{padding:10px 20px;background:#228be6;color:#fff;border:none;border-radius
 .modal-content{background:#fff;border-radius:12px;width:90%;max-width:600px;padding:24px;max-height:80vh;overflow:auto}
 .btn-item{display:flex;gap:12px;margin-bottom:12px;align-items:center}
 .btn-item input{flex:1;padding:8px 12px;border:1px solid #dee2e6;border-radius:6px}
+.image-upload-area{margin:16px 0;padding:16px;border:2px dashed #dee2e6;border-radius:8px;text-align:center}
+.image-upload-area:hover{border-color:#228be6}
+.uploaded-images{display:flex;flex-wrap:wrap;gap:12px;margin-top:12px}
+.uploaded-img-item{position:relative;width:100px;border:1px solid #dee2e6;border-radius:8px;overflow:hidden}
+.uploaded-img-item img{width:100%;height:80px;object-fit:cover}
+.uploaded-img-item button{position:absolute;top:4px;right:4px;padding:2px 6px;font-size:10px;background:rgba(0,0,0,0.6)}
+.image-preview{max-width:200px;margin-top:10px}
+.image-preview img{max-width:100%;border-radius:8px}
 </style>
 </head>
 <body>
@@ -373,7 +383,7 @@ button{padding:10px 20px;background:#228be6;color:#fff;border:none;border-radius
   </div>
 </div>
 
-<!-- 快捷按钮设置模态框 - 默认隐藏 -->
+<!-- 快捷按钮设置模态框 -->
 <div id="modal" class="modal hidden">
   <div class="modal-content">
     <div style="display:flex;justify-content:space-between;margin-bottom:20px">
@@ -385,6 +395,55 @@ button{padding:10px 20px;background:#228be6;color:#fff;border:none;border-radius
   </div>
 </div>
 
+<!-- 图片选择模态框 -->
+<div id="imageModal" class="modal hidden">
+  <div class="modal-content" style="max-width:800px">
+    <div style="display:flex;justify-content:space-between;margin-bottom:20px">
+      <h3>插入图片</h3>
+      <button onclick="closeImageModal()">关闭</button>
+    </div>
+    <div>
+      <div class="image-upload-area">
+        <p>📤 上传新图片</p>
+        <input type="file" id="modalImageFile" accept="image/*" style="margin:10px 0">
+        <button onclick="uploadModalImage()">上传</button>
+        <div id="modalUploadPreview"></div>
+      </div>
+      <div>
+        <p>🔗 使用外链图片</p>
+        <input type="text" id="externalImageUrl" placeholder="https://example.com/image.jpg" style="width:100%;padding:10px;margin:10px 0;border:1px solid #ddd;border-radius:6px">
+        <button onclick="insertExternalImage()">插入外链图片</button>
+      </div>
+      <div style="margin-top:20px">
+        <p>📁 已上传的图片</p>
+        <div id="uploadedImagesList" style="max-height:300px;overflow:auto"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 链接插入模态框 -->
+<div id="linkModal" class="modal hidden">
+  <div class="modal-content">
+    <div style="display:flex;justify-content:space-between;margin-bottom:20px">
+      <h3>插入链接</h3>
+      <button onclick="closeLinkModal()">关闭</button>
+    </div>
+    <div>
+      <p>链接地址</p>
+      <input type="text" id="linkUrl" placeholder="https://..." style="width:100%;padding:10px;margin:10px 0;border:1px solid #ddd;border-radius:6px">
+      <p>链接文字</p>
+      <input type="text" id="linkText" placeholder="显示的文字" style="width:100%;padding:10px;margin:10px 0;border:1px solid #ddd;border-radius:6px">
+      <p>是否新窗口打开</p>
+      <label><input type="checkbox" id="linkTarget" checked> 新窗口打开</label>
+      <div style="margin-top:20px">
+        <button onclick="insertLink()">插入链接</button>
+        <button onclick="wrapWithLink()" style="margin-left:10px">为选中文字添加链接</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 let currentImg = "";
 let editId = null;
@@ -392,6 +451,7 @@ let logoUrl = "";
 let quickList = [];
 let posts = [];
 let currentId = null;
+let uploadedImages = [];
 
 function esc(s){
   if(!s) return "";
@@ -431,7 +491,7 @@ function renderQuick(){
 
 async function loadPosts(){
   try {
-    const r = await fetch("/api/blog");  // 前台接口，不返回top字段
+    const r = await fetch("/api/blog");
     const d = await r.json();
     posts = d.list || [];
     renderArtList();
@@ -448,7 +508,6 @@ function renderArtList(){
   let h = "";
   posts.forEach(p => {
     const act = currentId === p.id ? "active" : "";
-    // 前台不显示置顶标记
     h += '<div class="art-item '+act+'" onclick="openPost(\''+p.id+'\')">' +
       '<div class="art-title-text">'+esc(p.title)+'</div>' +
       '<div class="art-time">'+new Date(p.time).toLocaleDateString()+'</div>' +
@@ -491,7 +550,6 @@ function showPost(p){
     '<button class="btn2" onclick="edit(\''+p.id+'\')">编辑</button>' +
     '<button class="btn-danger" onclick="del(\''+p.id+'\')">删除</button>' +
   '</div>' : "";
-  // 前台不显示置顶标记
   m.innerHTML = '<div class="card">' +
     '<h1 class="post-title">'+esc(p.title||"无标题")+'</h1>' +
     '<div class="post-meta">'+new Date(p.time).toLocaleString()+'</div>' +
@@ -561,6 +619,142 @@ async function login(){
   } catch(e) { alert("登录失败"); }
 }
 
+// 编辑器工具栏功能
+function showImageModal(){
+  loadUploadedImages();
+  document.getElementById("imageModal").classList.remove("hidden");
+}
+
+function closeImageModal(){
+  document.getElementById("imageModal").classList.add("hidden");
+  document.getElementById("modalImageFile").value = "";
+  document.getElementById("externalImageUrl").value = "";
+  document.getElementById("modalUploadPreview").innerHTML = "";
+}
+
+async function loadUploadedImages(){
+  // 从服务器获取已上传的图片列表（需要添加对应API）
+  // 这里简单地从localStorage或模拟数据获取
+  const container = document.getElementById("uploadedImagesList");
+  if(container){
+    container.innerHTML = '<div style="text-align:center;color:#999">加载中...</div>';
+    // 实际应该调用API获取图片列表，这里先显示提示
+    container.innerHTML = '<div style="text-align:center;color:#999">上传新图片后会自动显示在这里</div>';
+  }
+}
+
+async function uploadModalImage(){
+  const fileInput = document.getElementById("modalImageFile");
+  const file = fileInput.files[0];
+  if(!file){
+    alert("请选择图片");
+    return;
+  }
+  const formData = new FormData();
+  formData.append("file", file);
+  try {
+    const r = await fetch("/api/upload", {
+      method: "POST",
+      headers: {"Authorization": "Bearer "+localStorage.getItem("token")},
+      body: formData
+    });
+    const j = await r.json();
+    if(j.success){
+      document.getElementById("modalUploadPreview").innerHTML = '<div class="image-preview"><img src="'+j.url+'"><br><small>上传成功！点击下方按钮插入</small><br><button onclick="insertImageAtCursor(\''+j.url+'\')">插入此图片</button></div>';
+    } else {
+      alert("上传失败");
+    }
+  } catch(e) { alert("上传失败"); }
+}
+
+function insertExternalImage(){
+  const url = document.getElementById("externalImageUrl").value.trim();
+  if(!url){
+    alert("请输入图片地址");
+    return;
+  }
+  insertImageAtCursor(url);
+  closeImageModal();
+}
+
+function insertImageAtCursor(imgUrl){
+  const textarea = document.getElementById("text");
+  if(!textarea) return;
+  const cursorPos = textarea.selectionStart;
+  const textBefore = textarea.value.substring(0, cursorPos);
+  const textAfter = textarea.value.substring(cursorPos);
+  const imgHtml = '<img src="'+imgUrl+'" alt="image" style="max-width:100%">';
+  textarea.value = textBefore + imgHtml + textAfter;
+}
+
+function showLinkModal(){
+  document.getElementById("linkModal").classList.remove("hidden");
+  document.getElementById("linkUrl").value = "";
+  document.getElementById("linkText").value = "";
+}
+
+function closeLinkModal(){
+  document.getElementById("linkModal").classList.add("hidden");
+}
+
+function insertLink(){
+  const url = document.getElementById("linkUrl").value.trim();
+  const text = document.getElementById("linkText").value.trim();
+  const target = document.getElementById("linkTarget").checked;
+  if(!url){
+    alert("请输入链接地址");
+    return;
+  }
+  const linkText = text || url;
+  const targetAttr = target ? ' target="_blank"' : '';
+  const linkHtml = '<a href="'+esc(url)+'"'+targetAttr+'>'+esc(linkText)+'</a>';
+  
+  const textarea = document.getElementById("text");
+  if(!textarea) return;
+  const cursorPos = textarea.selectionStart;
+  const textBefore = textarea.value.substring(0, cursorPos);
+  const textAfter = textarea.value.substring(cursorPos);
+  textarea.value = textBefore + linkHtml + textAfter;
+  closeLinkModal();
+}
+
+function wrapWithLink(){
+  const url = document.getElementById("linkUrl").value.trim();
+  const target = document.getElementById("linkTarget").checked;
+  if(!url){
+    alert("请输入链接地址");
+    return;
+  }
+  const textarea = document.getElementById("text");
+  if(!textarea) return;
+  const start = textarea.selectionStart;
+  const end = textarea.selectionEnd;
+  const selectedText = textarea.value.substring(start, end);
+  if(!selectedText){
+    alert("请先选中要添加链接的文字");
+    return;
+  }
+  const targetAttr = target ? ' target="_blank"' : '';
+  const linkHtml = '<a href="'+esc(url)+'"'+targetAttr+'>'+esc(selectedText)+'</a>';
+  textarea.value = textarea.value.substring(0, start) + linkHtml + textarea.value.substring(end);
+  closeLinkModal();
+}
+
+function insertHtmlTag(tag, wrapper){
+  const textarea = document.getElementById("text");
+  if(!textarea) return;
+  const start = textarea.selectionStart;
+  const end = textarea.selectionEnd;
+  const selectedText = textarea.value.substring(start, end);
+  let html = "";
+  if(wrapper){
+    html = wrapper.replace("{text}", selectedText || "text");
+  } else {
+    html = "<"+tag+">" + (selectedText || "text") + "</"+tag+">";
+  }
+  textarea.value = textarea.value.substring(0, start) + html + textarea.value.substring(end);
+}
+
 function showPublish(){
   if(!localStorage.getItem("token")){ showLogin(); return; }
   currentImg = "";
@@ -572,15 +766,25 @@ function showPublish(){
     '<input id="title" class="editor-title" placeholder="标题">' +
     '<div style="margin:12px 0"><label><input type="checkbox" id="top"> 设为置顶</label></div>' +
     '<div class="toolbar">' +
-      '<button type="button" onclick="fmt(\'bold\')">B</button>' +
-      '<button type="button" onclick="fmt(\'italic\')">I</button>' +
-      '<button type="button" onclick="fmt(\'underline\')">U</button>' +
-      '<button type="button" onclick="fmt(\'h3\')">H3</button>' +
-      '<button type="button" onclick="link()">🔗链接</button>' +
-      '<button type="button" onclick="img()">🖼️图片</button>' +
+      '<button type="button" onclick="insertHtmlTag(\'strong\')">B</button>' +
+      '<button type="button" onclick="insertHtmlTag(\'em\')">I</button>' +
+      '<button type="button" onclick="insertHtmlTag(\'u\')">U</button>' +
+      '<button type="button" onclick="insertHtmlTag(\'h3\')">H3</button>' +
+      '<span class="divider"></span>' +
+      '<button type="button" onclick="insertHtmlTag(\'ul\', \'<ul><li>项目1</li><li>项目2</li></ul>\')">列表</button>' +
+      '<button type="button" onclick="insertHtmlTag(\'blockquote\')">引用</button>' +
+      '<span class="divider"></span>' +
+      '<button type="button" onclick="showLinkModal()">🔗链接</button>' +
+      '<button type="button" onclick="showImageModal()">🖼️图片</button>' +
+      '<button type="button" onclick="insertHtmlTag(\'hr\')">分隔线</button>' +
+      '<span class="divider"></span>' +
+      '<button type="button" onclick="insertHtmlTag(\'code\')">代码</button>' +
+      '<button type="button" onclick="insertHtmlTag(\'pre\')">代码块</button>' +
     '</div>' +
-    '<textarea id="text" class="editor-text" placeholder="内容"></textarea>' +
+    '<textarea id="text" class="editor-text" placeholder="写文章内容...支持HTML标签"></textarea>' +
     '<div style="margin:16px 0">' +
+      '<h4>封面图片</h4>' +
+      '<p style="font-size:12px;color:#666">上传封面图片会显示在文章顶部</p>' +
       '<input type="file" id="file" accept="image/*">' +
       '<button type="button" onclick="upImg()">上传封面</button>' +
     '</div>' +
@@ -606,7 +810,7 @@ async function upImg(){
     const j = await r.json();
     if(j.success){
       currentImg = j.url;
-      document.getElementById("prev").innerHTML = '<img src="'+j.url+'" style="max-width:200px;border-radius:8px"><br><button type="button" onclick="currentImg=\'\';document.getElementById(\'prev\').innerHTML=\'\'">移除</button>';
+      document.getElementById("prev").innerHTML = '<div class="image-preview"><img src="'+j.url+'"><br><button type="button" onclick="currentImg=\'\';document.getElementById(\'prev\').innerHTML=\'\'">移除封面</button></div>';
     } else {
       alert("上传失败");
     }
@@ -645,28 +849,37 @@ async function edit(id){
     const p = await r.json();
     editId = id;
     currentImg = p.img || "";
-    const m = document.getElementById("mainContent");
-    if(!m) return;
-    // 编辑时需要获取文章的置顶状态，需要单独调用后台接口
     const adminR = await fetch("/api/admin/blogs");
     const adminD = await adminR.json();
     const adminPost = adminD.list.find(item => item.id === id);
     const isTop = adminPost ? adminPost.top : false;
     
+    const m = document.getElementById("mainContent");
+    if(!m) return;
     m.innerHTML = '<div class="editor">' +
-      '<h2>编辑</h2>' +
+      '<h2>编辑文章</h2>' +
       '<input id="title" class="editor-title" value="'+esc(p.title)+'">' +
       '<div style="margin:12px 0"><label><input type="checkbox" id="top" '+(isTop?"checked":"")+'> 设为置顶</label></div>' +
       '<div class="toolbar">' +
-        '<button type="button" onclick="fmt(\'bold\')">B</button>' +
-        '<button type="button" onclick="fmt(\'italic\')">I</button>' +
-        '<button type="button" onclick="fmt(\'underline\')">U</button>' +
-        '<button type="button" onclick="fmt(\'h3\')">H3</button>' +
-        '<button type="button" onclick="link()">🔗链接</button>' +
-        '<button type="button" onclick="img()">🖼️图片</button>' +
+        '<button type="button" onclick="insertHtmlTag(\'strong\')">B</button>' +
+        '<button type="button" onclick="insertHtmlTag(\'em\')">I</button>' +
+        '<button type="button" onclick="insertHtmlTag(\'u\')">U</button>' +
+        '<button type="button" onclick="insertHtmlTag(\'h3\')">H3</button>' +
+        '<span class="divider"></span>' +
+        '<button type="button" onclick="insertHtmlTag(\'ul\', \'<ul><li>项目1</li><li>项目2</li></ul>\')">列表</button>' +
+        '<button type="button" onclick="insertHtmlTag(\'blockquote\')">引用</button>' +
+        '<span class="divider"></span>' +
+        '<button type="button" onclick="showLinkModal()">🔗链接</button>' +
+        '<button type="button" onclick="showImageModal()">🖼️图片</button>' +
+        '<button type="button" onclick="insertHtmlTag(\'hr\')">分隔线</button>' +
+        '<span class="divider"></span>' +
+        '<button type="button" onclick="insertHtmlTag(\'code\')">代码</button>' +
+        '<button type="button" onclick="insertHtmlTag(\'pre\')">代码块</button>' +
       '</div>' +
       '<textarea id="text" class="editor-text">'+esc(p.content)+'</textarea>' +
       '<div style="margin:16px 0">' +
+        '<h4>封面图片</h4>' +
+        '<p style="font-size:12px;color:#666">上传封面图片会显示在文章顶部</p>' +
         '<input type="file" id="file" accept="image/*">' +
         '<button type="button" onclick="upImg()">上传封面</button>' +
       '</div>' +
@@ -677,7 +890,7 @@ async function edit(id){
       '</div>' +
     '</div>';
     if(currentImg) {
-      document.getElementById("prev").innerHTML = '<img src="'+currentImg+'" style="max-width:200px;border-radius:8px"><br><button type="button" onclick="currentImg=\'\';document.getElementById(\'prev\').innerHTML=\'\'">移除</button>';
+      document.getElementById("prev").innerHTML = '<div class="image-preview"><img src="'+currentImg+'"><br><button type="button" onclick="currentImg=\'\';document.getElementById(\'prev\').innerHTML=\'\'">移除封面</button></div>';
     }
   } catch(e) { console.error(e); }
 }
@@ -765,13 +978,11 @@ async function delLogo(){
 async function renderManagePosts(){
   const o = document.getElementById("managePosts");
   if(!o) return;
-  // 后台管理使用专门的接口，包含top字段
   const r = await fetch("/api/admin/blogs");
   const d = await r.json();
   const adminPosts = d.list || [];
   let h = "";
   adminPosts.forEach(p => {
-    // 后台显示置顶标记
     const top = p.top ? " <span style='color:#ff6b6b'>[置顶]</span>" : "";
     h += '<div style="border:1px solid #e9ecef;border-radius:8px;padding:12px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center">' +
       '<div><strong>'+esc(p.title)+'</strong>'+top+'<br><small>'+new Date(p.time).toLocaleDateString()+'</small></div>' +
@@ -828,42 +1039,6 @@ async function saveQuick(){
     closeModal();
     loadQuick();
   } catch(e) { alert("保存失败"); }
-}
-
-function link(){
-  const t = document.getElementById("text");
-  if(!t) return;
-  const s = t.selectionStart;
-  const e = t.selectionEnd;
-  const sel = t.value.substring(s, e);
-  const u = prompt("链接：");
-  if(!u) return;
-  const txt = sel || prompt("文字：");
-  if(!txt) return;
-  t.value = t.value.substring(0, s) + '<a href="'+esc(u)+'" target="_blank">'+esc(txt)+'</a>' + t.value.substring(e);
-}
-
-function img(){
-  const u = prompt("图片地址：");
-  if(!u) return;
-  const t = document.getElementById("text");
-  if(!t) return;
-  const s = t.selectionStart;
-  t.value = t.value.substring(0, s) + '<img src="'+esc(u)+'" style="max-width:100%">' + t.value.substring(s);
-}
-
-function fmt(type){
-  const a = document.getElementById("text");
-  if(!a) return;
-  const s = a.selectionStart;
-  const e = a.selectionEnd;
-  const v = a.value.substring(s, e);
-  let r = "";
-  if(type === "bold") r = '<strong>'+v+'</strong>';
-  else if(type === "italic") r = '<em>'+v+'</em>';
-  else if(type === "underline") r = '<u>'+v+'</u>';
-  else if(type === "h3") r = '<h3>'+v+'</h3>';
-  a.value = a.value.substring(0, s) + r + a.value.substring(e);
 }
 
 async function init(){
