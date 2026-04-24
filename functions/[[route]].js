@@ -1,4 +1,4 @@
-// /functions/[[route]].js - Cloudflare Pages Functions
+// /functions/[[route]].js - Cloudflare Pages Functions（左侧栏布局版）
 
 // ========== 修改这里的用户名和密码 ==========
 const USERNAME = "admin";
@@ -6,6 +6,21 @@ const PASSWORD = "ww123456";
 // =========================================
 
 const LOGO_KV_KEY = "site_logo_info";
+const BUTTONS_KV_KEY = "quick_buttons";  // 存储10个按钮配置
+
+// 默认按钮配置
+const DEFAULT_BUTTONS = [
+  { name: "按钮1", url: "https://example.com/1", enabled: true },
+  { name: "按钮2", url: "https://example.com/2", enabled: true },
+  { name: "按钮3", url: "https://example.com/3", enabled: true },
+  { name: "按钮4", url: "https://example.com/4", enabled: true },
+  { name: "按钮5", url: "https://example.com/5", enabled: true },
+  { name: "按钮6", url: "https://example.com/6", enabled: true },
+  { name: "按钮7", url: "https://example.com/7", enabled: true },
+  { name: "按钮8", url: "https://example.com/8", enabled: true },
+  { name: "按钮9", url: "https://example.com/9", enabled: true },
+  { name: "按钮10", url: "https://example.com/10", enabled: true }
+];
 
 function verifyToken(token) {
   if (!token) return false;
@@ -213,30 +228,64 @@ async function handleUploadImage(request, env) {
   }
 }
 
-// 获取文章列表 - 修复版
-async function handleGetBlogs(env) {
+// 获取按钮配置
+async function handleGetButtons(env) {
   try {
-    // 检查 KV 是否可用
-    if (!env || !env.BLOG_KV) {
-      console.error("KV 绑定不存在，请检查 Pages 设置中的 KV 命名空间绑定，变量名必须为 BLOG_KV");
-      return new Response(JSON.stringify({ 
-        list: [], 
-        error: "KV 绑定不存在，请检查 Pages 设置中的 KV 命名空间绑定，变量名必须为 BLOG_KV",
-        kvAvailable: false 
-      }), {
+    const buttonsData = await env.BLOG_KV.get(BUTTONS_KV_KEY);
+    if (buttonsData) {
+      return new Response(buttonsData, {
         headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
       });
     }
-    
-    // 测试 KV 是否可读
-    const testRead = await env.BLOG_KV.get("test_key").catch(e => null);
+    return new Response(JSON.stringify(DEFAULT_BUTTONS), {
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+    });
+  } catch (e) {
+    return new Response(JSON.stringify(DEFAULT_BUTTONS), {
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+    });
+  }
+}
+
+// 保存按钮配置
+async function handleSaveButtons(request, env) {
+  const auth = request.headers.get("Authorization");
+  const token = auth?.replace("Bearer ", "");
+  if (!token || !verifyToken(token)) {
+    return new Response(JSON.stringify({ success: false, message: "请先登录" }), { 
+      status: 401,
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+    });
+  }
+  
+  try {
+    const buttons = await request.json();
+    await env.BLOG_KV.put(BUTTONS_KV_KEY, JSON.stringify(buttons));
+    return new Response(JSON.stringify({ success: true }), {
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+    });
+  } catch (e) {
+    return new Response(JSON.stringify({ success: false, message: e.message }), { 
+      status: 500,
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+    });
+  }
+}
+
+// 获取文章列表（用于左侧栏）
+async function handleGetBlogs(env) {
+  try {
+    if (!env || !env.BLOG_KV) {
+      return new Response(JSON.stringify({ list: [], error: "KV绑定不存在" }), {
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+      });
+    }
     
     const list = [];
     const { keys } = await env.BLOG_KV.list();
     
     for (const key of keys) {
-      // 只获取文章数据（ID 是纯数字的键）
-      if (!key.name.startsWith("img_") && !key.name.startsWith("logo_") && key.name !== LOGO_KV_KEY && /^\d+$/.test(key.name)) {
+      if (!key.name.startsWith("img_") && !key.name.startsWith("logo_") && key.name !== LOGO_KV_KEY && key.name !== BUTTONS_KV_KEY && /^\d+$/.test(key.name)) {
         const value = await env.BLOG_KV.get(key.name);
         if (value) {
           try {
@@ -247,29 +296,55 @@ async function handleGetBlogs(env) {
               time: post.time || 0,
               img: post.img || ""
             });
-          } catch (e) {
-            console.error(`解析文章失败 ${key.name}:`, e);
-          }
+          } catch (e) {}
         }
       }
     }
     list.sort((a, b) => b.time - a.time);
     
-    return new Response(JSON.stringify({ 
-      list: list,
-      count: list.length,
-      kvAvailable: true,
-      totalKeys: keys.length
-    }), {
+    return new Response(JSON.stringify({ list: list }), {
       headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
     });
   } catch (e) {
-    console.error("获取文章列表失败:", e);
-    return new Response(JSON.stringify({ 
-      list: [], 
-      error: e.message,
-      kvAvailable: false
-    }), {
+    return new Response(JSON.stringify({ list: [], error: e.message }), {
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+    });
+  }
+}
+
+// 获取置顶文章（最新一篇）
+async function handleGetFeaturedPost(env) {
+  try {
+    const { keys } = await env.BLOG_KV.list();
+    let featuredPost = null;
+    let latestTime = 0;
+    
+    for (const key of keys) {
+      if (!key.name.startsWith("img_") && !key.name.startsWith("logo_") && key.name !== LOGO_KV_KEY && key.name !== BUTTONS_KV_KEY && /^\d+$/.test(key.name)) {
+        const value = await env.BLOG_KV.get(key.name);
+        if (value) {
+          try {
+            const post = JSON.parse(value);
+            if (post.time > latestTime) {
+              latestTime = post.time;
+              featuredPost = {
+                id: key.name,
+                title: post.title,
+                content: post.content || "",
+                img: post.img || "",
+                time: post.time
+              };
+            }
+          } catch (e) {}
+        }
+      }
+    }
+    
+    return new Response(JSON.stringify(featuredPost || { isEmpty: true }), {
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+    });
+  } catch (e) {
+    return new Response(JSON.stringify({ error: e.message }), {
       headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
     });
   }
@@ -319,13 +394,11 @@ async function handleCreateBlog(request, env) {
       time: Date.now()
     };
     
-    // 保存文章
     await env.BLOG_KV.put(id, JSON.stringify(post));
     
-    // 验证保存
     const saved = await env.BLOG_KV.get(id);
     if (!saved) {
-      return new Response(JSON.stringify({ success: false, message: "保存失败，请重试" }), { 
+      return new Response(JSON.stringify({ success: false, message: "保存失败" }), { 
         status: 500,
         headers: { "Content-Type": "application/json" }
       });
@@ -424,7 +497,6 @@ async function handleGetImage(key, env) {
   }
 }
 
-// 处理OPTIONS请求
 function handleOptions() {
   return new Response(null, {
     headers: {
@@ -442,19 +514,31 @@ export async function onRequest(context) {
   const path = url.pathname;
   const method = request.method;
   
-  // 处理根路径 - 返回HTML页面
   if (method === "GET" && path === "/") {
     return new Response(getHTML(), {
       headers: { "Content-Type": "text/html;charset=UTF-8" }
     });
   }
   
-  // 处理OPTIONS
   if (method === "OPTIONS") {
     return handleOptions();
   }
   
-  // 路由处理
+  // 新增：获取按钮配置
+  if (method === "GET" && path === "/api/buttons") {
+    return handleGetButtons(env);
+  }
+  
+  // 新增：保存按钮配置
+  if (method === "POST" && path === "/api/buttons") {
+    return handleSaveButtons(request, env);
+  }
+  
+  // 新增：获取置顶文章
+  if (method === "GET" && path === "/api/featured") {
+    return handleGetFeaturedPost(env);
+  }
+  
   if (method === "GET" && path === "/api/logo") {
     return handleGetLogo(env);
   }
@@ -503,7 +587,6 @@ export async function onRequest(context) {
     return handleDeleteBlog(id, request, env);
   }
   
-  // 如果路径不是/api开头，返回HTML
   if (method === "GET" && !path.startsWith("/api/")) {
     return new Response(getHTML(), {
       headers: { "Content-Type": "text/html;charset=UTF-8" }
@@ -522,78 +605,144 @@ function getHTML() {
 '<title>博客系统</title>' +
 '<style>' +
 '*{margin:0;padding:0;box-sizing:border-box}' +
-'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;padding:20px;background:#f5f7fa;min-height:100vh}' +
-'.container{max-width:900px;margin:0 auto;background:white;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.08);overflow:hidden}' +
-'.header{display:flex;justify-content:space-between;align-items:center;padding:16px 24px;background:#fff;border-bottom:1px solid #e9ecef}' +
-'.logo-area{display:flex;align-items:center;gap:12px}' +
-'.logo-img{width:120px;height:120px;border-radius:50%;object-fit:cover;border:2px solid #e9ecef}' +
-'.logo-placeholder{width:120px;height:120px;border-radius:50%;background:#f1f3f5;display:flex;align-items:center;justify-content:center;font-size:20px;color:#adb5bd}' +
-'.blog-title{font-size:20px;font-weight:600;color:#212529}' +
-'.nav{display:flex;gap:20px}' +
-'.nav a{color:#495057;cursor:pointer;text-decoration:none;font-size:15px;padding:4px 0}' +
-'.nav a:hover{color:#228be6}' +
-'.nav button{background:none;border:none;color:#495057;cursor:pointer;font-size:15px;padding:4px 0;margin:0}' +
-'.nav button:hover{color:#228be6}' +
-'.main{padding:24px}' +
-'.post{border:1px solid #e9ecef;padding:20px;margin:16px 0;border-radius:12px;cursor:pointer;transition:box-shadow 0.2s,transform 0.1s}' +
-'.post:hover{box-shadow:0 4px 12px rgba(0,0,0,0.05);transform:translateY(-1px)}' +
-'.title{font-size:20px;font-weight:600;color:#212529;margin-bottom:8px}' +
-'.time{color:#868e96;font-size:13px;margin-top:8px}' +
-'.content{margin-top:16px;line-height:1.7;color:#495057}' +
-'img{max-width:100%;border-radius:8px}' +
-'button{padding:8px 16px;background:#228be6;color:white;border:none;border-radius:6px;cursor:pointer;font-size:14px;transition:background 0.2s}' +
-'button:hover{background:#1c7ed6}' +
-'input,textarea{width:100%;padding:10px;margin:8px 0;border:1px solid #dee2e6;border-radius:6px;font-size:14px;font-family:inherit}' +
-'input:focus,textarea:focus{outline:none;border-color:#228be6;box-shadow:0 0 0 3px rgba(34,139,230,0.1)}' +
-'.hidden{display:none}' +
-'.preview-img{max-width:200px;margin:10px 0;border-radius:8px}' +
-'.edit-btn{background:#40c057}' +
-'.edit-btn:hover{background:#37b24d}' +
-'.delete-btn{background:#fa5252}' +
-'.delete-btn:hover{background:#f03e3e}' +
-'.toolbar{background:#f8f9fa;border:1px solid #dee2e6;border-radius:8px;padding:8px;margin-bottom:8px;display:flex;gap:6px;flex-wrap:wrap}' +
-'.toolbar button{background:#e9ecef;color:#495057;padding:4px 10px;font-size:13px}' +
+'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;background:#f5f7fa;min-height:100vh}' +
+
+'/* 左右布局 */' +
+'.app-container{display:flex;min-height:100vh}' +
+
+'/* 左侧边栏 */' +
+'.sidebar{width:280px;background:white;border-right:1px solid #e9ecef;display:flex;flex-direction:column;position:fixed;height:100vh;overflow-y:auto}' +
+'.sidebar-header{padding:20px;text-align:center;border-bottom:1px solid #e9ecef}' +
+'.sidebar-logo{width:60px;height:60px;border-radius:50%;object-fit:cover;margin-bottom:12px}' +
+'.sidebar-title{font-size:18px;font-weight:600;color:#212529}' +
+
+'/* 快捷按钮区 */' +
+'.quick-buttons{padding:16px;border-bottom:1px solid #e9ecef}' +
+'.quick-buttons-title{font-size:14px;font-weight:600;color:#495057;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center}' +
+'.quick-buttons-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}' +
+'.quick-btn{display:block;padding:10px 8px;background:#f8f9fa;border-radius:8px;text-decoration:none;font-size:13px;color:#228be6;text-align:center;transition:all 0.2s;border:1px solid #e9ecef}' +
+'.quick-btn:hover{background:#e9ecef;transform:translateY(-1px)}' +
+
+'/* 文章列表区 */' +
+'.articles-list{padding:16px;flex:1}' +
+'.articles-title{font-size:14px;font-weight:600;color:#495057;margin-bottom:12px}' +
+'.article-item{padding:12px;margin-bottom:8px;border-radius:8px;cursor:pointer;transition:background 0.2s;border:1px solid #e9ecef}' +
+'.article-item:hover{background:#f8f9fa}' +
+'.article-item.active{background:#e3f2fd;border-color:#228be6}' +
+'.article-title{font-size:14px;font-weight:500;color:#212529;margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
+'.article-time{font-size:11px;color:#adb5bd}' +
+
+'/* 右侧主内容区 */' +
+'.main-content{flex:1;margin-left:280px;padding:24px}' +
+'.content-card{background:white;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.05);padding:32px}' +
+'.post-title{font-size:28px;font-weight:600;color:#212529;margin-bottom:16px}' +
+'.post-meta{color:#868e96;font-size:14px;margin-bottom:24px;padding-bottom:16px;border-bottom:1px solid #e9ecef}' +
+'.post-img{max-width:100%;border-radius:12px;margin:20px 0}' +
+'.post-content{line-height:1.8;color:#495057}' +
+'.post-content p{margin-bottom:16px}' +
+'.empty-state{text-align:center;padding:60px 20px;color:#adb5bd}' +
+
+'/* 头部导航 */' +
+'.header-nav{display:flex;justify-content:flex-end;gap:16px;margin-bottom:24px}' +
+'.nav-link{color:#495057;cursor:pointer;text-decoration:none;padding:6px 12px;border-radius:6px}' +
+'.nav-link:hover{background:#f1f3f5}' +
+'.nav-link.login-btn{background:#228be6;color:white}' +
+'.nav-link.login-btn:hover{background:#1c7ed6}' +
+
+'/* 编辑器样式 */' +
+'.editor-container{background:white;border-radius:12px;padding:24px}' +
+'.editor-title{width:100%;padding:12px;font-size:20px;border:1px solid #dee2e6;border-radius:8px;margin-bottom:16px}' +
+'.toolbar{background:#f8f9fa;border:1px solid #dee2e6;border-radius:8px;padding:8px;margin-bottom:12px;display:flex;gap:6px;flex-wrap:wrap}' +
+'.toolbar button{background:#e9ecef;color:#495057;padding:6px 12px;font-size:13px}' +
 '.toolbar button:hover{background:#dee2e6}' +
-'h2{font-size:24px;margin-bottom:20px;color:#212529}' +
-'h3{font-size:18px;margin-bottom:16px;color:#212529}' +
-'.logo-settings{background:#f8f9fa;border-radius:12px;padding:20px;margin-bottom:28px}' +
-'.logo-preview-area{display:flex;align-items:center;gap:24px;margin-bottom:16px;flex-wrap:wrap}' +
-'.current-logo-preview{width:64px;height:64px;border-radius:50%;object-fit:cover;border:2px solid #dee2e6}' +
-'.logo-actions{display:flex;gap:12px}' +
+'.editor-content{width:100%;padding:16px;border:1px solid #dee2e6;border-radius:8px;font-family:inherit;font-size:14px;line-height:1.6;min-height:300px}' +
+'.upload-area{margin:16px 0}' +
+'.preview-img{max-width:200px;margin:10px 0;border-radius:8px}' +
+'.action-buttons{display:flex;gap:12px;margin-top:20px}' +
+'button{padding:10px 20px;background:#228be6;color:white;border:none;border-radius:6px;cursor:pointer;font-size:14px}' +
+'button:hover{background:#1c7ed6}' +
 '.btn-secondary{background:#adb5bd}' +
 '.btn-secondary:hover{background:#868e96}' +
 '.btn-danger{background:#fa5252}' +
 '.btn-danger:hover{background:#f03e3e}' +
-'.btn-sm{padding:6px 14px;font-size:13px}' +
-'.settings-group{margin-top:12px}' +
+'.hidden{display:none}' +
+
+'/* 按钮管理模态框 */' +
+'.modal{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:1000}' +
+'.modal-content{background:white;border-radius:12px;width:90%;max-width:600px;max-height:80vh;overflow-y:auto;padding:24px}' +
+'.modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}' +
+'.btn-item{display:flex;gap:12px;margin-bottom:12px;align-items:center}' +
+'.btn-item input{flex:1;padding:8px 12px;border:1px solid #dee2e6;border-radius:6px}' +
+'.btn-item input:first-child{flex:0.3}' +
+'.btn-item .delete-btn-small{padding:6px 12px;background:#fa5252;font-size:12px}' +
+
+'/* 响应式 */' +
+'@media (max-width:768px){.sidebar{width:240px}.main-content{margin-left:240px;padding:16px}.post-title{font-size:22px}}' +
 '</style>' +
 '</head>' +
 '<body>' +
-'<div class="container">' +
-'<div class="header">' +
-'<div class="logo-area">' +
-'<div id="logoImageContainer">' +
-'<div class="logo-placeholder" id="logoPlaceholder">📷</div>' +
-'<img class="logo-img hidden" id="logoImg" alt="Logo">' +
+'<div class="app-container">' +
+'  <!-- 左侧边栏 -->' +
+'  <div class="sidebar">' +
+'    <div class="sidebar-header">' +
+'      <div id="sidebarLogoContainer">' +
+'        <img class="sidebar-logo hidden" id="sidebarLogo" alt="Logo">' +
+'        <div style="width:60px;height:60px;border-radius:50%;background:#f1f3f5;margin:0 auto 12px auto;display:flex;align-items:center;justify-content:center;font-size:30px;" id="sidebarLogoPlaceholder">📷</div>' +
+'      </div>' +
+'      <div class="sidebar-title" id="siteTitle">我的博客</div>' +
+'    </div>' +
+'    <!-- 快捷按钮区 -->' +
+'    <div class="quick-buttons">' +
+'      <div class="quick-buttons-title">' +
+'        <span>快捷链接</span>' +
+'        <span id="editButtonsBtn" style="cursor:pointer;font-size:12px;color:#228be6;" class="hidden">⚙️ 管理</span>' +
+'      </div>' +
+'      <div id="quickButtonsGrid" class="quick-buttons-grid"></div>' +
+'    </div>' +
+'    <!-- 文章列表区 -->' +
+'    <div class="articles-list">' +
+'      <div class="articles-title">📄 所有文章</div>' +
+'      <div id="articlesList"></div>' +
+'    </div>' +
+'  </div>' +
+'  <!-- 右侧主内容区 -->' +
+'  <div class="main-content">' +
+'    <div class="header-nav">' +
+'      <a id="publishNavBtn" class="nav-link hidden" onclick="showPublish()">写文章</a>' +
+'      <a id="manageNavBtn" class="nav-link hidden" onclick="showManage()">管理</a>' +
+'      <a id="loginNavBtn" class="nav-link login-btn" onclick="showLogin()">登录</a>' +
+'      <a id="logoutNavBtn" class="nav-link hidden" onclick="logout()">退出</a>' +
+'    </div>' +
+'    <div id="mainContent">' +
+'      <div class="content-card">' +
+'        <div class="empty-state">加载中...</div>' +
+'      </div>' +
+'    </div>' +
+'  </div>' +
 '</div>' +
-'<span class="blog-title">我的博客</span>' +
+
+'<!-- 按钮管理模态框 -->' +
+'<div id="buttonsModal" class="modal hidden">' +
+'  <div class="modal-content">' +
+'    <div class="modal-header">' +
+'      <h3>管理快捷按钮</h3>' +
+'      <button onclick="closeButtonsModal()" style="padding:6px 12px">关闭</button>' +
+'    </div>' +
+'    <div id="buttonsList"></div>' +
+'    <button onclick="saveButtons()" style="width:100%;margin-top:20px">保存设置</button>' +
+'  </div>' +
 '</div>' +
-'<div class="nav">' +
-'<a onclick="goHome()">首页</a>' +
-'<a id="publishBtn" class="hidden" onclick="goPublish()">写文章</a>' +
-'<a id="manageBtn" class="hidden" onclick="goManage()">管理</a>' +
-'<a id="loginBtn" onclick="goLogin()">登录</a>' +
-'<button id="logoutBtn" class="hidden" onclick="logout()">退出</button>' +
-'</div>' +
-'</div>' +
-'<div class="main" id="content"></div>' +
-'</div>' +
+
 '<script>' +
 'var currentImage = "";' +
 'var editId = null;' +
 'var currentLogoUrl = "";' +
 'var logoVersion = 0;' +
+'var quickButtons = [];' +
+'var allPosts = [];' +
+'var currentPostId = null;' +
 
+'// 加载Logo' +
 'async function loadLogo() {' +
 '  try {' +
 '    var res = await fetch("/api/logo");' +
@@ -609,45 +758,151 @@ function getHTML() {
 '    currentLogoUrl = "";' +
 '    updateLogoDisplay(null);' +
 '  } catch(e) {' +
-'    currentLogoUrl = "";' +
-'    updateLogoDisplay(null);' +
+'    console.error("加载Logo失败:", e);' +
 '  }' +
 '}' +
 
 'function updateLogoDisplay(url) {' +
-'  var logoImg = document.getElementById("logoImg");' +
-'  var placeholder = document.getElementById("logoPlaceholder");' +
-'  if (!logoImg || !placeholder) return;' +
+'  var sidebarLogo = document.getElementById("sidebarLogo");' +
+'  var placeholder = document.getElementById("sidebarLogoPlaceholder");' +
+'  if (!sidebarLogo || !placeholder) return;' +
 '  if (url && url !== "") {' +
-'    logoImg.src = url + "?v=" + logoVersion;' +
-'    logoImg.classList.remove("hidden");' +
-'    placeholder.classList.add("hidden");' +
+'    sidebarLogo.src = url + "?v=" + logoVersion;' +
+'    sidebarLogo.classList.remove("hidden");' +
+'    placeholder.style.display = "none";' +
 '  } else {' +
-'    logoImg.classList.add("hidden");' +
-'    placeholder.classList.remove("hidden");' +
+'    sidebarLogo.classList.add("hidden");' +
+'    placeholder.style.display = "flex";' +
 '  }' +
 '}' +
 
-'async function refreshLogoDisplay() {' +
-'  await loadLogo();' +
+'// 加载快捷按钮' +
+'async function loadQuickButtons() {' +
+'  try {' +
+'    var res = await fetch("/api/buttons");' +
+'    quickButtons = await res.json();' +
+'    renderQuickButtons();' +
+'  } catch(e) {' +
+'    console.error("加载按钮失败:", e);' +
+'  }' +
 '}' +
 
-'function goHome() { showHome(); }' +
-'function goLogin() { showLogin(); }' +
-'function goPublish() { editId = null; currentImage = ""; showPublish(); }' +
-'function goManage() { showManage(); }' +
+'function renderQuickButtons() {' +
+'  var container = document.getElementById("quickButtonsGrid");' +
+'  if (!container) return;' +
+'  var html = "";' +
+'  for (var i = 0; i < quickButtons.length; i++) {' +
+'    var btn = quickButtons[i];' +
+'    if (btn.enabled !== false) {' +
+'      html += "<a href=\\"" + escapeHtml(btn.url) + "\\" class=\\'quick-btn\\' target=\\"_blank\\" rel=\\"noopener noreferrer\\">" + escapeHtml(btn.name) + "</a>";' +
+'    }' +
+'  }' +
+'  container.innerHTML = html;' +
+'}' +
 
+'// 加载文章列表' +
+'async function loadArticlesList() {' +
+'  try {' +
+'    var res = await fetch("/api/blog");' +
+'    var data = await res.json();' +
+'    allPosts = data.list || [];' +
+'    renderArticlesList();' +
+'  } catch(e) {' +
+'    console.error("加载文章列表失败:", e);' +
+'  }' +
+'}' +
+
+'function renderArticlesList() {' +
+'  var container = document.getElementById("articlesList");' +
+'  if (!container) return;' +
+'  if (allPosts.length === 0) {' +
+'    container.innerHTML = "<div style=\\'text-align:center;color:#adb5bd;padding:20px\\'>暂无文章</div>";' +
+'    return;' +
+'  }' +
+'  var html = "";' +
+'  for (var i = 0; i < allPosts.length; i++) {' +
+'    var post = allPosts[i];' +
+'    var activeClass = (currentPostId === post.id) ? "active" : "";' +
+'    html += "<div class=\\'article-item " + activeClass + "\\' onclick=\\'loadPost(\\"" + post.id + "\\")\\'>" +' +
+'      "<div class=\\'article-title\\'>" + escapeHtml(post.title) + "</div>" +' +
+'      "<div class=\\'article-time\\'>" + new Date(post.time).toLocaleDateString() + "</div>" +' +
+'      "</div>";' +
+'  }' +
+'  container.innerHTML = html;' +
+'}' +
+
+'// 加载置顶文章（最新一篇）' +
+'async function loadFeaturedPost() {' +
+'  try {' +
+'    var res = await fetch("/api/featured");' +
+'    var post = await res.json();' +
+'    if (post && !post.isEmpty && post.id) {' +
+'      currentPostId = post.id;' +
+'      displayPost(post);' +
+'      renderArticlesList();' +
+'    } else if (allPosts.length > 0) {' +
+'      loadPost(allPosts[0].id);' +
+'    } else {' +
+'      displayEmptyState();' +
+'    }' +
+'  } catch(e) {' +
+'    console.error("加载置顶文章失败:", e);' +
+'    if (allPosts.length > 0) loadPost(allPosts[0].id);' +
+'    else displayEmptyState();' +
+'  }' +
+'}' +
+
+'// 加载指定文章' +
+'async function loadPost(id) {' +
+'  try {' +
+'    var res = await fetch("/api/blog/" + id);' +
+'    var post = await res.json();' +
+'    currentPostId = id;' +
+'    displayPost(post);' +
+'    renderArticlesList();' +
+'  } catch(e) {' +
+'    console.error("加载文章失败:", e);' +
+'  }' +
+'}' +
+
+'function displayPost(post) {' +
+'  var container = document.getElementById("mainContent");' +
+'  if (!container) return;' +
+'  var token = localStorage.getItem("token");' +
+'  var editHtml = "";' +
+'  if (token) {' +
+'    editHtml = "<div style=\\'margin-top:30px;display:flex;gap:12px\\'><button class=\\'btn-secondary\\' onclick=\\'editPost(\\"" + post.id + "\\")\\'>编辑文章</button><button class=\\'btn-danger\\' onclick=\\'deletePost(\\"" + post.id + "\\")\\'>删除文章</button></div>";' +
+'  }' +
+'  var html = "<div class=\\'content-card\\'>" +' +
+'    "<h1 class=\\'post-title\\'>" + escapeHtml(post.title) + "</h1>" +' +
+'    "<div class=\\'post-meta\\'>发布时间：" + new Date(post.time).toLocaleString() + "</div>" +' +
+'    (post.img ? "<img src=\\"" + post.img + "\\" class=\\'post-img\\' alt=\\'封面\\'>" : "") +' +
+'    "<div class=\\'post-content\\'>" + (post.content ? post.content.replace(/\\n/g, "<br>") : "") + "</div>" +' +
+'    editHtml +' +
+'    "</div>";' +
+'  container.innerHTML = html;' +
+'}' +
+
+'function displayEmptyState() {' +
+'  var container = document.getElementById("mainContent");' +
+'  if (!container) return;' +
+'  container.innerHTML = "<div class=\\'content-card\\'><div class=\\'empty-state\\'>✨ 暂无文章<br><br><button onclick=\\'showPublish()\\'>发布第一篇文章</button></div></div>";' +
+'}' +
+
+'// 更新导航按钮' +
 'function updateNav() {' +
 '  var t = localStorage.getItem("token");' +
-'  var l = !!t;' +
-'  var pb = document.getElementById("publishBtn");' +
-'  var mb = document.getElementById("manageBtn");' +
-'  var lb = document.getElementById("loginBtn");' +
-'  var lbt = document.getElementById("logoutBtn");' +
-'  if(pb) { if(l) pb.classList.remove("hidden"); else pb.classList.add("hidden"); }' +
-'  if(mb) { if(l) mb.classList.remove("hidden"); else mb.classList.add("hidden"); }' +
-'  if(lb) { if(l) lb.classList.add("hidden"); else lb.classList.remove("hidden"); }' +
-'  if(lbt) { if(l) lbt.classList.remove("hidden"); else lbt.classList.add("hidden"); }' +
+'  var isLoggedIn = !!t;' +
+'  var publishBtn = document.getElementById("publishNavBtn");' +
+'  var manageBtn = document.getElementById("manageNavBtn");' +
+'  var loginBtn = document.getElementById("loginNavBtn");' +
+'  var logoutBtn = document.getElementById("logoutNavBtn");' +
+'  var editButtonsBtn = document.getElementById("editButtonsBtn");' +
+'  if(publishBtn) publishBtn.classList.toggle("hidden", !isLoggedIn);' +
+'  if(manageBtn) manageBtn.classList.toggle("hidden", !isLoggedIn);' +
+'  if(loginBtn) loginBtn.classList.toggle("hidden", isLoggedIn);' +
+'  if(logoutBtn) logoutBtn.classList.toggle("hidden", !isLoggedIn);' +
+'  if(editButtonsBtn) editButtonsBtn.classList.toggle("hidden", !isLoggedIn);' +
 '}' +
 
 'function logout() {' +
@@ -655,7 +910,195 @@ function getHTML() {
 '  currentImage = "";' +
 '  editId = null;' +
 '  updateNav();' +
-'  showHome();' +
+'  loadArticlesList();' +
+'  loadFeaturedPost();' +
+'}' +
+
+'function showLogin() {' +
+'  var container = document.getElementById("mainContent");' +
+'  container.innerHTML = "<div class=\\'content-card\\'><h2>登录后台</h2><div style=\\'margin-top:20px\\'><input id=loginUser type=text placeholder=用户名 style=\\'width:100%;padding:10px;margin-bottom:12px;border:1px solid #dee2e6;border-radius:6px\\'><br><input id=loginPass type=password placeholder=密码 style=\\'width:100%;padding:10px;margin-bottom:20px;border:1px solid #dee2e6;border-radius:6px\\'><br><button onclick=\\'doLogin()\\' style=\\'width:100%\\'>登录</button></div></div>";' +
+'}' +
+
+'async function doLogin() {' +
+'  var user = document.getElementById("loginUser")?.value;' +
+'  var pass = document.getElementById("loginPass")?.value;' +
+'  if(!user||!pass){ alert("请输入用户名和密码"); return; }' +
+'  try{' +
+'    var res = await fetch("/api/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:user,password:pass})});' +
+'    var data = await res.json();' +
+'    if(data.success){' +
+'      localStorage.setItem("token",data.token);' +
+'      updateNav();' +
+'      await loadArticlesList();' +
+'      await loadFeaturedPost();' +
+'    } else { alert("登录失败"); }' +
+'  } catch(e){ alert("登录失败"); }' +
+'}' +
+
+'function showPublish() {' +
+'  var token = localStorage.getItem("token");' +
+'  if(!token){ showLogin(); return; }' +
+'  editId = null;' +
+'  currentImage = "";' +
+'  var container = document.getElementById("mainContent");' +
+'  container.innerHTML = "<div class=\\'editor-container\\'><h2>发布文章</h2><div style=\\'margin-top:20px\\'><input id=title type=text placeholder=标题 class=\\'editor-title\\'><div class=\\'toolbar\\'><button onclick=\\'formatText(\\"bold\\")\\'>B</button><button onclick=\\'formatText(\\"italic\\")\\'>I</button><button onclick=\\'formatText(\\"underline\\")\\'>U</button><button onclick=\\'formatText(\\"h3\\")\\'>H3</button><button onclick=\\'insertLink()\\'>🔗链接</button><button onclick=\\'insertImage()\\'>🖼️图片</button></div><textarea id=contentText class=\\'editor-content\\' placeholder=内容></textarea><div class=\\'upload-area\\'><input type=file id=imgFile accept=image/*><button onclick=\\'uploadImg()\\' style=\\'margin-left:10px\\'>上传封面</button></div><div id=preview></div><div class=\\'action-buttons\\'><button onclick=\\'doPublish()\\'>发布文章</button><button class=\\'btn-secondary\\' onclick=\\'loadFeaturedPost()\\'>取消</button></div></div></div>";' +
+'}' +
+
+'async function uploadImg() {' +
+'  var file = document.getElementById("imgFile")?.files[0];' +
+'  if(!file){ alert("请选择图片"); return; }' +
+'  var form = new FormData();' +
+'  form.append("file",file);' +
+'  try{' +
+'    var res = await fetch("/api/upload",{method:"POST",headers:{"Authorization":"Bearer "+localStorage.getItem("token")},body:form});' +
+'    var data = await res.json();' +
+'    if(data.success){' +
+'      currentImage = data.url;' +
+'      document.getElementById("preview").innerHTML = "<img src=\\""+data.url+"\\" class=\\'preview-img\\'><br><button onclick=\\'removeImg()\\'>移除图片</button>";' +
+'    } else { alert("上传失败"); }' +
+'  } catch(e){ alert("上传失败"); }' +
+'}' +
+
+'function removeImg() { currentImage = ""; document.getElementById("preview").innerHTML = ""; }' +
+
+'async function doPublish() {' +
+'  var title = document.getElementById("title")?.value.trim();' +
+'  var content = document.getElementById("contentText")?.value;' +
+'  if(!title){ alert("请输入标题"); return; }' +
+'  try{' +
+'    var res = await fetch("/api/blog",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+localStorage.getItem("token")},body:JSON.stringify({title:title,content:content,img:currentImage})});' +
+'    var data = await res.json();' +
+'    if(data.success){ alert("发布成功"); await loadArticlesList(); await loadFeaturedPost(); }' +
+'    else { alert("发布失败"); }' +
+'  } catch(e){ alert("发布失败"); }' +
+'}' +
+
+'async function editPost(id) {' +
+'  var token = localStorage.getItem("token");' +
+'  if(!token){ alert("请先登录"); showLogin(); return; }' +
+'  try{' +
+'    var res = await fetch("/api/blog/"+id);' +
+'    var p = await res.json();' +
+'    editId = id;' +
+'    currentImage = p.img || "";' +
+'    var container = document.getElementById("mainContent");' +
+'    container.innerHTML = "<div class=\\'editor-container\\'><h2>编辑文章</h2><div style=\\'margin-top:20px\\'><input id=title type=text placeholder=标题 class=\\'editor-title\\' value=\\""+escapeHtml(p.title)+"\\"><div class=\\'toolbar\\'><button onclick=\\'formatText(\\"bold\\")\\'>B</button><button onclick=\\'formatText(\\"italic\\")\\'>I</button><button onclick=\\'formatText(\\"underline\\")\\'>U</button><button onclick=\\'formatText(\\"h3\\")\\'>H3</button><button onclick=\\'insertLink()\\'>🔗链接</button><button onclick=\\'insertImage()\\'>🖼️图片</button></div><textarea id=contentText class=\\'editor-content\\' placeholder=内容>"+escapeHtml(p.content)+"</textarea><div class=\\'upload-area\\'><input type=file id=imgFile accept=image/*><button onclick=\\'uploadImg()\\' style=\\'margin-left:10px\\'>上传封面</button></div><div id=preview></div><div class=\\'action-buttons\\'><button onclick=\\'doUpdate()\\'>更新文章</button><button class=\\'btn-secondary\\' onclick=\\'loadFeaturedPost()\\'>取消</button></div></div></div>";' +
+'    if(currentImage){ document.getElementById("preview").innerHTML = "<img src=\\""+currentImage+"\\" class=\\'preview-img\\'><br><button onclick=\\'removeImg()\\'>移除图片</button>"; }' +
+'  } catch(e){ alert("加载失败"); }' +
+'}' +
+
+'async function doUpdate() {' +
+'  var title = document.getElementById("title")?.value.trim();' +
+'  var content = document.getElementById("contentText")?.value;' +
+'  if(!title){ alert("请输入标题"); return; }' +
+'  try{' +
+'    var res = await fetch("/api/blog/"+editId,{method:"PUT",headers:{"Content-Type":"application/json","Authorization":"Bearer "+localStorage.getItem("token")},body:JSON.stringify({title:title,content:content,img:currentImage})});' +
+'    var data = await res.json();' +
+'    if(data.success){ alert("更新成功"); await loadArticlesList(); await loadFeaturedPost(); }' +
+'    else { alert("更新失败"); }' +
+'  } catch(e){ alert("更新失败"); }' +
+'}' +
+
+'async function deletePost(id) {' +
+'  if(!confirm("确定删除这篇文章？")) return;' +
+'  try{' +
+'    var res = await fetch("/api/blog/"+id,{method:"DELETE",headers:{"Authorization":"Bearer "+localStorage.getItem("token")}});' +
+'    if(res.ok){ alert("删除成功"); await loadArticlesList(); await loadFeaturedPost(); }' +
+'    else { alert("删除失败"); }' +
+'  } catch(e){ alert("删除失败"); }' +
+'}' +
+
+'function showManage() {' +
+'  var token = localStorage.getItem("token");' +
+'  if(!token){ showLogin(); return; }' +
+'  var container = document.getElementById("mainContent");' +
+'  var logoHtml = currentLogoUrl ? "<img src=\\""+currentLogoUrl+"?v="+logoVersion+"\\" style=\\'width:80px;height:80px;border-radius:50%;object-fit:cover\\'>" : "<div style=\\'width:80px;height:80px;border-radius:50%;background:#f1f3f5;display:flex;align-items:center;justify-content:center;font-size:40px\\'>📷</div>";' +
+'  container.innerHTML = "<div class=\\'content-card\\'><h2>管理后台</h2>" +' +
+'    "<div style=\\'margin-bottom:30px;padding:20px;background:#f8f9fa;border-radius:12px\\'>" +' +
+'    "<h3>🖼️ Logo设置</h3>" +' +
+'    "<div style=\\'display:flex;align-items:center;gap:20px;margin:16px 0\\'>" + logoHtml + "</div>" +' +
+'    "<button onclick=\\'document.getElementById(\\"logoUpload\\").click()\\'>更换Logo</button>" +' +
+'    (currentLogoUrl ? "<button class=\\'btn-danger\\' style=\\'margin-left:10px\\' onclick=\\'deleteLogo()\\'>恢复默认</button>" : "") +' +
+'    "<input type=file id=logoUpload accept=\\'image/*\\' style=\\'display:none\\' onchange=\\'uploadLogoFile(this.files[0])\\'>" +' +
+'    "</div>" +' +
+'    "<div style=\\'margin-bottom:30px\\'><h3>🔗 快捷按钮管理</h3><button onclick=\\'openButtonsModal()\\' style=\\'margin-top:12px\\'>管理10个快捷按钮</button></div>" +' +
+'    "<div><h3>📝 文章列表</h3><div id=managePosts></div></div></div>";' +
+'  renderManagePosts();' +
+'}' +
+
+'async function renderManagePosts() {' +
+'  var container = document.getElementById("managePosts");' +
+'  if (!container) return;' +
+'  if (allPosts.length === 0) { container.innerHTML = "<p>暂无文章</p>"; return; }' +
+'  var html = "";' +
+'  for (var i = 0; i < allPosts.length; i++) {' +
+'    var p = allPosts[i];' +
+'    html += "<div style=\\'border:1px solid #e9ecef;border-radius:8px;padding:12px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center\\'>" +' +
+'      "<div><strong>" + escapeHtml(p.title) + "</strong><br><small>" + new Date(p.time).toLocaleDateString() + "</small></div>" +' +
+'      "<div><button class=\\'btn-secondary\\' style=\\'margin-right:8px\\' onclick=\\'editPost(\\""+p.id+"\\")\\'>编辑</button><button class=\\'btn-danger\\' onclick=\\'deletePost(\\""+p.id+"\\")\\'>删除</button></div></div>";' +
+'  }' +
+'  container.innerHTML = html;' +
+'}' +
+
+'async function uploadLogoFile(file) {' +
+'  if (!file) return;' +
+'  var formData = new FormData();' +
+'  formData.append("logo", file);' +
+'  try {' +
+'    var res = await fetch("/api/logo/upload", {method:"POST",headers:{"Authorization":"Bearer "+localStorage.getItem("token")},body:formData});' +
+'    var data = await res.json();' +
+'    if (data.success) { alert("Logo更换成功"); location.reload(); }' +
+'    else { alert("上传失败"); }' +
+'  } catch(e) { alert("上传失败"); }' +
+'}' +
+
+'async function deleteLogo() {' +
+'  if (!confirm("确定恢复默认Logo？")) return;' +
+'  try {' +
+'    var res = await fetch("/api/logo", {method:"DELETE",headers:{"Authorization":"Bearer "+localStorage.getItem("token")}});' +
+'    if (res.ok) { alert("已恢复默认"); location.reload(); }' +
+'    else { alert("删除失败"); }' +
+'  } catch(e) { alert("删除失败"); }' +
+'}' +
+
+'function openButtonsModal() {' +
+'  var modal = document.getElementById("buttonsModal");' +
+'  if (!modal) return;' +
+'  var container = document.getElementById("buttonsList");' +
+'  var html = "";' +
+'  for (var i = 0; i < quickButtons.length; i++) {' +
+'    var btn = quickButtons[i];' +
+'    html += "<div class=\\'btn-item\\'>" +' +
+'      "<input type=\\'text\\' placeholder=\\'按钮名称\\' value=\\"" + escapeHtml(btn.name) + "\\' id=\\'btn_name_" + i + "\\'>" +' +
+'      "<input type=\\'text\\' placeholder=\\'链接地址\\' value=\\"" + escapeHtml(btn.url) + "\\' id=\\'btn_url_" + i + "\\'>" +' +
+'      "<label><input type=\\'checkbox\\' id=\\'btn_enabled_" + i + "' + (btn.enabled !== false ? " checked" : "") + "> 启用</label>" +' +
+'      "</div>";' +
+'  }' +
+'  container.innerHTML = html;' +
+'  modal.classList.remove("hidden");' +
+'}' +
+
+'function closeButtonsModal() {' +
+'  document.getElementById("buttonsModal").classList.add("hidden");' +
+'}' +
+
+'async function saveButtons() {' +
+'  var newButtons = [];' +
+'  for (var i = 0; i < quickButtons.length; i++) {' +
+'    var nameInput = document.getElementById("btn_name_" + i);' +
+'    var urlInput = document.getElementById("btn_url_" + i);' +
+'    var enabledInput = document.getElementById("btn_enabled_" + i);' +
+'    newButtons.push({' +
+'      name: nameInput ? nameInput.value : "按钮" + (i+1),' +
+'      url: urlInput ? urlInput.value : "https://example.com",' +
+'      enabled: enabledInput ? enabledInput.checked : true' +
+'    });' +
+'  }' +
+'  try {' +
+'    var res = await fetch("/api/buttons", {method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+localStorage.getItem("token")},body:JSON.stringify(newButtons)});' +
+'    if (res.ok) { alert("保存成功"); await loadQuickButtons(); closeButtonsModal(); }' +
+'    else { alert("保存失败"); }' +
+'  } catch(e) { alert("保存失败"); }' +
 '}' +
 
 'function insertLink() {' +
@@ -702,325 +1145,8 @@ function getHTML() {
 '  if(formatted){' +
 '    var newVal = ta.value.substring(0,start)+formatted+ta.value.substring(end);' +
 '    ta.value = newVal;' +
-'    ta.selectionStart = start+formatted.length;' +
-'    ta.selectionEnd = start+formatted.length;' +
 '    ta.focus();' +
 '  }' +
-'}' +
-
-'async function showHome() {' +
-'  var div = document.getElementById("content");' +
-'  if (!div) { console.error("content element not found"); return; }' +
-'  div.innerHTML = "<h2>文章列表</h2><div id=posts>加载中...</div>";' +
-'  try{' +
-'    var res = await fetch("/api/blog");' +
-'    var data = await res.json();' +
-'    console.log("API返回数据:", data);' +
-'    var html = "";' +
-'    if(data.list && data.list.length>0){' +
-'      for(var i=0;i<data.list.length;i++){' +
-'        var p = data.list[i];' +
-'        html += "<div class=post onclick=viewPost(\\""+p.id+"\\")>";' +
-'        if(p.img && p.img!="") html += "<img src=\\""+p.img+"\\" style=max-width:100%>";' +
-'        html += "<div class=title>"+escapeHtml(p.title)+"</div>";' +
-'        if(p.time) html += "<div class=time>"+new Date(p.time).toLocaleString()+"</div>";' +
-'        html += "</div>";' +
-'      }' +
-'    } else { ' +
-'      html = "<p>暂无文章</p>";' +
-'      if(data.error) html = "<p style=color:red>错误: " + escapeHtml(data.error) + "</p>";' +
-'    }' +
-'    var postsDiv = document.getElementById("posts");' +
-'    if (postsDiv) postsDiv.innerHTML = html;' +
-'  } catch(e){' +
-'    console.error("加载失败:", e);' +
-'    var postsDiv = document.getElementById("posts");' +
-'    if (postsDiv) postsDiv.innerHTML = "<p>加载失败: " + e.message + "</p>";' +
-'  }' +
-'}' +
-
-'async function viewPost(id) {' +
-'  var div = document.getElementById("content");' +
-'  if (!div) return;' +
-'  div.innerHTML = "<button onclick=showHome()>返回</button><div>加载中...</div>";' +
-'  try{' +
-'    var res = await fetch("/api/blog/"+id);' +
-'    var p = await res.json();' +
-'    var html = "<h2>"+escapeHtml(p.title)+"</h2>";' +
-'    if(p.img && p.img!="") html += "<img src=\\""+p.img+"\\" style=max-width:100%>";' +
-'    if(p.time) html += "<div>发布时间："+new Date(p.time).toLocaleString()+"</div>";' +
-'    html += "<div class=content>"+(p.content?p.content.replace(/\\n/g,"<br>"):"")+"</div>";' +
-'    var token = localStorage.getItem("token");' +
-'    if(token){' +
-'      html += "<div style=margin-top:20px><button class=edit-btn onclick=editPost(\\""+id+"\\")>编辑文章</button><button class=delete-btn onclick=delPostFromView(\\""+id+"\\")>删除文章</button></div>";' +
-'    }' +
-'    div.innerHTML = "<button onclick=showHome()>返回</button>"+html;' +
-'  } catch(e){' +
-'    div.innerHTML = "<button onclick=showHome()>返回</button><p>加载失败: " + e.message + "</p>";' +
-'  }' +
-'}' +
-
-'async function editPost(id) {' +
-'  var token = localStorage.getItem("token");' +
-'  if(!token){ alert("请先登录"); showLogin(); return; }' +
-'  try{' +
-'    var res = await fetch("/api/blog/"+id);' +
-'    var p = await res.json();' +
-'    editId = id;' +
-'    currentImage = p.img || "";' +
-'    var div = document.getElementById("content");' +
-'    if (!div) return;' +
-'    div.innerHTML = "<h2>编辑文章</h2><div style=margin:20px 0><input id=title type=text placeholder=标题 value=\\""+escapeHtml(p.title)+"\\"><br><div class=toolbar><button onclick=formatText(\\"bold\\")><b>B</b></button><button onclick=formatText(\\"italic\\")><i>I</i></button><button onclick=formatText(\\"underline\\")><u>U</u></button><button onclick=formatText(\\"h3\\")>H3</button><button onclick=insertLink()>🔗插入链接</button><button onclick=insertImage()>🖼️插入图片</button></div><textarea id=contentText rows=12 placeholder=内容>"+escapeHtml(p.content)+"</textarea><br><input type=file id=imgFile accept=image/*><br><button onclick=uploadImg()>上传图片</button><div id=preview></div><button onclick=doUpdate()>更新文章</button><button onclick=goManage()>取消</button></div>";' +
-'    if(currentImage){' +
-'      document.getElementById("preview").innerHTML = "<img src=\\""+currentImage+"\\" class=preview-img><br><button onclick=removeImg()>移除图片</button>";' +
-'    }' +
-'  } catch(e){ alert("加载文章失败: " + e.message); }' +
-'}' +
-
-'async function doUpdate() {' +
-'  var title = document.getElementById("title")?.value.trim();' +
-'  var content = document.getElementById("contentText")?.value;' +
-'  if(!title){ alert("请输入标题"); return; }' +
-'  try{' +
-'    var res = await fetch("/api/blog/"+editId,{' +
-'      method:"PUT",' +
-'      headers:{"Content-Type":"application/json","Authorization":"Bearer "+localStorage.getItem("token")},' +
-'      body:JSON.stringify({title:title,content:content,img:currentImage})' +
-'    });' +
-'    var data = await res.json();' +
-'    if(data.success){ alert("更新成功"); editId=null; currentImage=""; showManage(); }' +
-'    else { alert("更新失败: " + (data.message || "未知错误")); }' +
-'  } catch(e){ alert("更新失败: " + e.message); }' +
-'}' +
-
-'async function delPostFromView(id) {' +
-'  if(!confirm("确定删除这篇文章？")) return;' +
-'  try{' +
-'    var res = await fetch("/api/blog/"+id,{method:"DELETE",headers:{"Authorization":"Bearer "+localStorage.getItem("token")}});' +
-'    if(res.ok){ alert("删除成功"); showHome(); }' +
-'    else { var err = await res.json(); alert("删除失败: " + (err.message || "未知错误")); }' +
-'  } catch(e){ alert("删除失败: " + e.message); }' +
-'}' +
-
-'function showLogin() {' +
-'  var div = document.getElementById("content");' +
-'  if (!div) return;' +
-'  div.innerHTML = "<h2>登录</h2><form autocomplete=off><input id=user type=text placeholder=用户名 autocomplete=off style=width:100%><br><input id=pass type=password placeholder=密码 autocomplete=new-password style=width:100%><br><button type=button onclick=doLogin()>登录</button></form>";' +
-'}' +
-
-'async function doLogin() {' +
-'  var user = document.getElementById("user")?.value;' +
-'  var pass = document.getElementById("pass")?.value;' +
-'  if(!user||!pass){ alert("请输入用户名和密码"); return; }' +
-'  try{' +
-'    var res = await fetch("/api/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:user,password:pass})});' +
-'    var data = await res.json();' +
-'    if(data.success){' +
-'      localStorage.setItem("token",data.token);' +
-'      updateNav();' +
-'      showPublish();' +
-'    } else { alert("登录失败: " + (data.message || "用户名或密码错误")); }' +
-'  } catch(e){ alert("登录失败: " + e.message); }' +
-'}' +
-
-'function showPublish() {' +
-'  var token = localStorage.getItem("token");' +
-'  if(!token){ showLogin(); return; }' +
-'  currentImage = "";' +
-'  editId = null;' +
-'  var div = document.getElementById("content");' +
-'  if (!div) return;' +
-'  div.innerHTML = "<h2>发布文章</h2><div style=margin:20px 0><input id=title type=text placeholder=标题><br><div class=toolbar><button onclick=formatText(\\"bold\\")><b>B</b></button><button onclick=formatText(\\"italic\\")><i>I</i></button><button onclick=formatText(\\"underline\\")><u>U</u></button><button onclick=formatText(\\"h3\\")>H3</button><button onclick=insertLink()>🔗插入链接</button><button onclick=insertImage()>🖼️插入图片</button></div><textarea id=contentText rows=12 placeholder=内容></textarea><br><input type=file id=imgFile accept=image/*><br><button onclick=uploadImg()>上传图片</button><div id=preview></div><button onclick=doPublish()>发布文章</button></div>";' +
-'}' +
-
-'async function uploadImg() {' +
-'  var file = document.getElementById("imgFile")?.files[0];' +
-'  if(!file){ alert("请选择图片"); return; }' +
-'  if(!file.type.startsWith("image/")){ alert("请选择图片文件"); return; }' +
-'  var form = new FormData();' +
-'  form.append("file",file);' +
-'  try{' +
-'    var res = await fetch("/api/upload",{method:"POST",headers:{"Authorization":"Bearer "+localStorage.getItem("token")},body:form});' +
-'    var data = await res.json();' +
-'    if(data.success){' +
-'      currentImage = data.url;' +
-'      var preview = document.getElementById("preview");' +
-'      if(preview) preview.innerHTML = "<img src=\\""+data.url+"\\" class=preview-img><br><button onclick=removeImg()>移除图片</button>";' +
-'      alert("图片上传成功");' +
-'    } else { alert("上传失败："+(data.message||"未知错误")); }' +
-'  } catch(e){ alert("上传失败: " + e.message); }' +
-'}' +
-
-'function removeImg() {' +
-'  currentImage = "";' +
-'  var preview = document.getElementById("preview");' +
-'  if(preview) preview.innerHTML = "";' +
-'  var fileInput = document.getElementById("imgFile");' +
-'  if(fileInput) fileInput.value = "";' +
-'}' +
-
-'async function doPublish() {' +
-'  var title = document.getElementById("title")?.value.trim();' +
-'  var content = document.getElementById("contentText")?.value;' +
-'  if(!title){ alert("请输入标题"); return; }' +
-'  try{' +
-'    var res = await fetch("/api/blog",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+localStorage.getItem("token")},body:JSON.stringify({title:title,content:content,img:currentImage})});' +
-'    var data = await res.json();' +
-'    if(data.success){ alert("发布成功"); editId=null; currentImage=""; showHome(); }' +
-'    else { alert("发布失败: " + (data.message || "未知错误")); }' +
-'  } catch(e){ alert("发布失败: " + e.message); }' +
-'}' +
-
-'async function uploadLogo(file) {' +
-'  if (!file) return false;' +
-'  if (!file.type.startsWith("image/")) {' +
-'    alert("请选择图片文件 (jpg, png, gif, webp)");' +
-'    return false;' +
-'  }' +
-'  if (file.size > 2 * 1024 * 1024) {' +
-'    alert("Logo图片不能超过2MB");' +
-'    return false;' +
-'  }' +
-'  var formData = new FormData();' +
-'  formData.append("logo", file);' +
-'  try {' +
-'    var token = localStorage.getItem("token");' +
-'    var res = await fetch("/api/logo/upload", {' +
-'      method: "POST",' +
-'      headers: { "Authorization": "Bearer " + token },' +
-'      body: formData' +
-'    });' +
-'    var data = await res.json();' +
-'    if (res.ok && data.success) {' +
-'      currentLogoUrl = data.url;' +
-'      logoVersion = data.version || Date.now();' +
-'      updateLogoDisplay(currentLogoUrl);' +
-'      alert("Logo更换成功！");' +
-'      return true;' +
-'    } else {' +
-'      alert(data.message || "上传失败");' +
-'      return false;' +
-'    }' +
-'  } catch(e) {' +
-'    alert("上传失败: " + e.message);' +
-'    return false;' +
-'  }' +
-'}' +
-
-'async function deleteLogo() {' +
-'  if (!confirm("确定要删除Logo恢复默认吗？")) return;' +
-'  try {' +
-'    var token = localStorage.getItem("token");' +
-'    var res = await fetch("/api/logo", {' +
-'      method: "DELETE",' +
-'      headers: { "Authorization": "Bearer " + token }' +
-'    });' +
-'    var data = await res.json();' +
-'    if (res.ok && data.success) {' +
-'      currentLogoUrl = "";' +
-'      updateLogoDisplay(null);' +
-'      alert("Logo已恢复默认");' +
-'      return true;' +
-'    } else {' +
-'      alert(data.message || "删除失败");' +
-'      return false;' +
-'    }' +
-'  } catch(e) {' +
-'    alert("删除失败: " + e.message);' +
-'    return false;' +
-'  }' +
-'}' +
-
-'async function showManage() {' +
-'  var token = localStorage.getItem("token");' +
-'  if(!token){ showLogin(); return; }' +
-'  var div = document.getElementById("content");' +
-'  if (!div) return;' +
-'  var currentLogoHtml = "";' +
-'  if (currentLogoUrl) {' +
-'    currentLogoHtml = "<img src=\'" + currentLogoUrl + "?v=" + logoVersion + "\' class=\'current-logo-preview\' id=\'manageLogoPreview\' alt=\'Logo预览\'>";' +
-'  } else {' +
-'    currentLogoHtml = "<div class=\'current-logo-preview\' style=\'display:flex;align-items:center;justify-content:center;background:#f1f3f5\'>📷</div>";' +
-'  }' +
-'  var deleteBtnDisabled = !currentLogoUrl ? "disabled style=\'opacity:0.5\'" : "";' +
-'  div.innerHTML = "<h2>管理后台</h2>" +' +
-'    "<div class=\'logo-settings\'>" +' +
-'    "<h3>🖼️ 网站Logo设置</h3>" +' +
-'    "<div class=\'logo-preview-area\'>" +' +
-'    "<div><div style=\'font-size:13px;color:#868e96;margin-bottom:6px\'>当前Logo预览：</div>" + currentLogoHtml + "</div>" +' +
-'    "<div class=\'logo-actions\'>" +' +
-'    "<button class=\'btn-secondary btn-sm\' id=\'selectLogoBtn\'>📁 选择图片</button>" +' +
-'    "<button class=\'btn-danger btn-sm\' id=\'deleteLogoBtn\' " + deleteBtnDisabled + ">🗑️ 恢复默认</button>" +' +
-'    "</div></div>" +' +
-'    "<div class=\'settings-group\'>" +' +
-'    "<small style=\'color:#868e96\'>支持 jpg、png、gif、webp 格式，大小不超过2MB。建议使用正方形图片。</small>" +' +
-'    "</div></div>" +' +
-'    "<h3>📄 文章管理</h3>" +' +
-'    "<div id=posts>加载中...</div>";' +
-
-'  var fileInput = document.createElement("input");' +
-'  fileInput.type = "file";' +
-'  fileInput.id = "logoUploadInput";' +
-'  fileInput.accept = "image/png,image/jpeg,image/jpg,image/gif,image/webp";' +
-'  fileInput.style.display = "none";' +
-'  div.appendChild(fileInput);' +
-
-'  var selectBtn = document.getElementById("selectLogoBtn");' +
-'  if (selectBtn) {' +
-'    selectBtn.onclick = function() { fileInput.click(); };' +
-'  }' +
-
-'  fileInput.onchange = async function(e) {' +
-'    if (e.target.files && e.target.files[0]) {' +
-'      var success = await uploadLogo(e.target.files[0]);' +
-'      if (success) {' +
-'        showManage();' +
-'        await refreshLogoDisplay();' +
-'      }' +
-'    }' +
-'    fileInput.value = "";' +
-'  };' +
-
-'  var deleteBtn = document.getElementById("deleteLogoBtn");' +
-'  if (deleteBtn && currentLogoUrl) {' +
-'    deleteBtn.onclick = async function() {' +
-'      var success = await deleteLogo();' +
-'      if (success) {' +
-'        showManage();' +
-'        await refreshLogoDisplay();' +
-'      }' +
-'    };' +
-'  }' +
-
-'  try{' +
-'    var res = await fetch("/api/blog");' +
-'    var data = await res.json();' +
-'    var html = "";' +
-'    if(data.list && data.list.length>0){' +
-'      for(var i=0;i<data.list.length;i++){' +
-'        var p = data.list[i];' +
-'        html += "<div class=post style=cursor:default>";' +
-'        if(p.img && p.img!="") html += "<img src=\'" + p.img + "\' style=max-width:100%>";' +
-'        html += "<div class=title>" + escapeHtml(p.title) + "</div>";' +
-'        html += "<div style=margin-top:12px><button class=edit-btn onclick=editPost(\'" + p.id + "\')>编辑</button><button class=delete-btn onclick=delPost(\'" + p.id + "\')>删除</button></div>";' +
-'        html += "</div>";' +
-'      }' +
-'    } else { html = "<p>暂无文章</p>"; }' +
-'    var postsDiv = document.getElementById("posts");' +
-'    if (postsDiv) postsDiv.innerHTML = html;' +
-'  } catch(e){' +
-'    var postsDiv = document.getElementById("posts");' +
-'    if (postsDiv) postsDiv.innerHTML = "<p>加载失败: " + e.message + "</p>";' +
-'  }' +
-'}' +
-
-'async function delPost(id) {' +
-'  if(!confirm("确定删除？")) return;' +
-'  try{' +
-'    var res = await fetch("/api/blog/"+id,{method:"DELETE",headers:{"Authorization":"Bearer "+localStorage.getItem("token")}});' +
-'    if(res.ok){ alert("删除成功"); showManage(); }' +
-'    else { var err = await res.json(); alert("删除失败: " + (err.message || "未知错误")); }' +
-'  } catch(e){ alert("删除失败: " + e.message); }' +
 '}' +
 
 'function escapeHtml(str) {' +
@@ -1033,14 +1159,16 @@ function getHTML() {
 '  });' +
 '}' +
 
-'// 等待DOM加载完成后初始化' +
-'if (document.readyState === "loading") {' +
-'  document.addEventListener("DOMContentLoaded", function() {' +
-'    loadLogo().then(function() { updateNav(); showHome(); });' +
-'  });' +
-'} else {' +
-'  loadLogo().then(function() { updateNav(); showHome(); });' +
+'// 初始化' +
+'async function init() {' +
+'  await loadLogo();' +
+'  await loadQuickButtons();' +
+'  await loadArticlesList();' +
+'  await loadFeaturedPost();' +
+'  updateNav();' +
 '}' +
+
+'init();' +
 '</script>' +
 '</body>' +
 '</html>';
