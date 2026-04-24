@@ -660,11 +660,16 @@ function closeModal(){
 async function saveQuick(){
   const arr=[];
   quickList.forEach((_,i)=>{
-    arr.push({
-      name:document.getElementById("n"+i).value,
-      url:document.getElementById("u"+i).value,
-      enabled:document.getElementById("e"+i).checked
-    });
+    const nameInput = document.getElementById("n"+i);
+    const urlInput = document.getElementById("u"+i);
+    const enabledInput = document.getElementById("e"+i);
+    if (nameInput && urlInput && enabledInput) {
+      arr.push({
+        name: nameInput.value,
+        url: urlInput.value,
+        enabled: enabledInput.checked
+      });
+    }
   });
   await fetch("/api/buttons",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+localStorage.getItem("token")},body:JSON.stringify(arr)});
   closeModal();
