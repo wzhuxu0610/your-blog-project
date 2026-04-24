@@ -787,18 +787,18 @@ function getHTML() {
 '  }' +
 '}' +
 
-'function renderQuickButtons() {' +
-'  var container = document.getElementById("quickButtonsGrid");' +
-'  if (!container) return;' +
-'  var html = "";' +
-'  for (var i = 0; i < quickButtons.length; i++) {' +
-'    var btn = quickButtons[i];' +
-'    if (btn.enabled !== false) {' +
-'      html += "<a href=\\"" + escapeHtml(btn.url) + "\\" class=\\'quick-btn\\' target=\\"_blank\\" rel=\\"noopener noreferrer\\">" + escapeHtml(btn.name) + "</a>";' +
-'    }' +
-'  }' +
-'  container.innerHTML = html;' +
-'}' +
+function renderQuickButtons() {
+  var container = document.getElementById("quickButtonsGrid");
+  if (!container) return;
+  var html = "";
+  for (var i = 0; i < quickButtons.length; i++) {
+    var btn = quickButtons[i];
+    if (btn.enabled !== false) {
+      html += "<a href=\"" + escapeHtml(btn.url) + "\" class=\"quick-btn\" target=\"_blank\" rel=\"noopener noreferrer\">" + escapeHtml(btn.name) + "</a>";
+    }
+  }
+  container.innerHTML = html;
+}
 
 '// 加载文章列表' +
 'async function loadArticlesList() {' +
