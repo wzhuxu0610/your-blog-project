@@ -1,4 +1,5 @@
-// /functions/[[route]].js - 修复默认按钮显示完整版
+// /functions/[[route]].js - 修复快捷按钮+置顶功能完整版
+
 // ========== 修改这里的用户名和密码 ==========
 const USERNAME = "admin";
 const PASSWORD = "ww123456";
@@ -126,16 +127,24 @@ async function handleUploadImage(request, env) {
   }
 }
 
-// 🔥 核心修复：永远优先返回你设置的默认按钮
 async function handleGetButtons(env) {
   try {
-    return new Response(JSON.stringify(DEFAULT_BUTTONS), {
-      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-    });
+    if (!env.BLOG_KV) {
+      console.log("KV未绑定，返回默认按钮");
+      return new Response(JSON.stringify(DEFAULT_BUTTONS), { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
+    }
+    const buttonsData = await env.BLOG_KV.get(BUTTONS_KV_KEY);
+    // 关键修复：无数据时强制返回默认按钮
+    if (!buttonsData) {
+      console.log("KV中无按钮数据，返回默认按钮");
+      return new Response(JSON.stringify(DEFAULT_BUTTONS), { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
+    }
+    console.log("返回存储的按钮数据");
+    return new Response(buttonsData, { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
   } catch (e) {
-    return new Response(JSON.stringify(DEFAULT_BUTTONS), {
-      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-    });
+    console.error("获取按钮出错:", e);
+    // 异常时也返回默认按钮
+    return new Response(JSON.stringify(DEFAULT_BUTTONS), { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
   }
 }
 
@@ -387,7 +396,7 @@ button:hover{background:#1c7ed6}
 .btn-danger{background:#fa5252}
 .btn-pin{background:#ff922b}
 .hidden{display:none}
-.modal{position:fixed;top=0;left=0;right=0;bottom=0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:1000}
+.modal{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:1000}
 .modal.hidden{display:none}
 .modal-content{background:white;border-radius:12px;width:90%;max-width:600px;max-height:80vh;overflow-y:auto;padding:24px}
 .modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
@@ -484,13 +493,25 @@ function updateLogoDisplay(url) {
   }
 }
 
+// 关键修复：初始化时确保有默认按钮
 async function loadQuickButtons() {
   try {
     var res = await fetch("/api/buttons");
-    quickButtons = await res.json() || [];
+    if (res.ok) {
+      quickButtons = await res.json();
+    } else {
+      quickButtons = ${JSON.stringify(DEFAULT_BUTTONS)};
+    }
+    // 确保quickButtons是数组并且有数据
+    if (!quickButtons || !Array.isArray(quickButtons) || quickButtons.length === 0) {
+      quickButtons = ${JSON.stringify(DEFAULT_BUTTONS)};
+    }
     renderQuickButtons();
   } catch(e) {
     console.error("加载按钮失败:", e);
+    // 异常时使用默认按钮
+    quickButtons = ${JSON.stringify(DEFAULT_BUTTONS)};
+    renderQuickButtons();
   }
 }
 
@@ -498,10 +519,15 @@ function renderQuickButtons() {
   var container = document.getElementById("quickButtonsGrid");
   if (!container) return;
   var html = "";
-  for (var i = 0; i < quickButtons.length; i++) {
-    var btn = quickButtons[i];
-    if (btn.enabled !== false) {
-      html += "<a href=\\"" + escapeHtml(btn.url) + "\\" class=\\"quick-btn\\" target=\\"_blank\\" rel=\\"noopener noreferrer\\">" + escapeHtml(btn.name) + "</a>";
+  // 确保数组存在且不为空
+  if (!quickButtons || !Array.isArray(quickButtons) || quickButtons.length === 0) {
+    html = "<div style='grid-column: span 2;text-align:center;color:#adb5bd'>暂无快捷链接</div>";
+  } else {
+    for (var i = 0; i < quickButtons.length; i++) {
+      var btn = quickButtons[i];
+      if (btn && btn.enabled !== false && btn.url && btn.name) {
+        html += "<a href=\\"" + escapeHtml(btn.url) + "\\" class=\\"quick-btn\\" target=\\"_blank\\" rel=\\"noopener noreferrer\\">" + escapeHtml(btn.name) + "</a>";
+      }
     }
   }
   container.innerHTML = html;
