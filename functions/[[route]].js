@@ -7,7 +7,7 @@ export async function onRequest(context) {
 
   // ========== 账号密码 ==========
   const USERNAME = "admin";
-  const PASSWORD = "ww123456";
+  const PASSWORD = "ww12356";
   // ============================
 
   const LOGO_KV_KEY = "site_logo_info";
@@ -119,10 +119,14 @@ export async function onRequest(context) {
   }
 
   async function handleSaveButtons(request, env) {
-    const auth = request.headers.get("Authorization");
-    const token = auth ? auth.replace("Bearer ", "") : "";
-    if (!verifyToken(token)) return new Response(JSON.stringify({ success: false }), { status: 401 });
-    
+    // ============== 修复 401 核心 ==============
+    const authHeader = request.headers.get("Authorization") || "";
+    const token = authHeader.split(" ")[1] || "";
+    if (!verifyToken(token)) {
+      return new Response(JSON.stringify({ success: false }), { status: 401 });
+    }
+    // ==========================================
+
     const buttons = await request.json();
     await env.BLOG_KV.put(BUTTONS_KV_KEY, JSON.stringify(buttons));
     return new Response(JSON.stringify({ success: true }));
@@ -671,7 +675,14 @@ async function saveQuick(){
       });
     }
   });
-  await fetch("/api/buttons",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+localStorage.getItem("token")},body:JSON.stringify(arr)});
+  await fetch("/api/buttons",{
+    method:"POST",
+    headers:{
+      "Content-Type":"application/json",
+      "Authorization":"Bearer "+localStorage.getItem("token")
+    },
+    body:JSON.stringify(arr)
+  });
   closeModal();
   loadQuick();
 }
