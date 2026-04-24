@@ -1,14 +1,12 @@
-// /functions/[[route]].js - 修复快捷按钮+置顶功能完整版
-
-// ========== 修改这里的用户名和密码 ==========
+// /functions/[[route]].js - 可在管理页修改快捷按钮 + 默认10个按钮
 const USERNAME = "admin";
 const PASSWORD = "ww123456";
-// =========================================
 
 const LOGO_KV_KEY = "site_logo_info";
 const BUTTONS_KV_KEY = "quick_buttons";
 const PINNED_KEY = "pinned_post_id";
 
+// 初始默认按钮（重置/首次访问时使用）
 const DEFAULT_BUTTONS = [
   { name: "百度", url: "https://www.baidu.com", enabled: true },
   { name: "谷歌", url: "https://www.google.com", enabled: true },
@@ -37,6 +35,7 @@ function getFullUrl(request) {
   return url;
 }
 
+// ---------- Logo ----------
 async function handleGetLogo(env) {
   try {
     if (!env.BLOG_KV) return new Response(JSON.stringify({ success: false, url: "" }), { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
@@ -94,6 +93,7 @@ async function handleDeleteLogo(request, env) {
   }
 }
 
+// ---------- 登录 ----------
 async function handleLogin(request) {
   try {
     const { username, password } = await request.json();
@@ -107,6 +107,7 @@ async function handleLogin(request) {
   }
 }
 
+// ---------- 上传图片 ----------
 async function handleUploadImage(request, env) {
   const auth = request.headers.get("Authorization");
   const token = auth?.replace("Bearer ", "");
@@ -127,24 +128,19 @@ async function handleUploadImage(request, env) {
   }
 }
 
+// ---------- 快捷按钮（核心修改） ----------
 async function handleGetButtons(env) {
   try {
-    if (!env.BLOG_KV) {
-      console.log("KV未绑定，返回默认按钮");
-      return new Response(JSON.stringify(DEFAULT_BUTTONS), { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
-    }
-    const buttonsData = await env.BLOG_KV.get(BUTTONS_KV_KEY);
-    // 关键修复：无数据时强制返回默认按钮
-    if (!buttonsData) {
-      console.log("KV中无按钮数据，返回默认按钮");
-      return new Response(JSON.stringify(DEFAULT_BUTTONS), { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
-    }
-    console.log("返回存储的按钮数据");
-    return new Response(buttonsData, { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
+    const raw = await env.BLOG_KV.get(BUTTONS_KV_KEY);
+    // 有就返回保存的，没有返回默认
+    const buttons = raw ? JSON.parse(raw) : DEFAULT_BUTTONS;
+    return new Response(JSON.stringify(buttons), {
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+    });
   } catch (e) {
-    console.error("获取按钮出错:", e);
-    // 异常时也返回默认按钮
-    return new Response(JSON.stringify(DEFAULT_BUTTONS), { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
+    return new Response(JSON.stringify(DEFAULT_BUTTONS), {
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+    });
   }
 }
 
@@ -154,6 +150,7 @@ async function handleSaveButtons(request, env) {
   if (!token || !verifyToken(token)) return new Response(JSON.stringify({ success: false, message: "请先登录" }), { status: 401, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
   try {
     const buttons = await request.json();
+    // 保存用户修改后的
     await env.BLOG_KV.put(BUTTONS_KV_KEY, JSON.stringify(buttons));
     return new Response(JSON.stringify({ success: true }), { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
   } catch (e) {
@@ -161,6 +158,20 @@ async function handleSaveButtons(request, env) {
   }
 }
 
+// 恢复默认按钮（管理页调用）
+async function handleResetButtons(request, env) {
+  const auth = request.headers.get("Authorization");
+  const token = auth?.replace("Bearer ", "");
+  if (!token || !verifyToken(token)) return new Response(JSON.stringify({ success: false, message: "请先登录" }), { status: 401, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
+  try {
+    await env.BLOG_KV.delete(BUTTONS_KV_KEY);
+    return new Response(JSON.stringify({ success: true, buttons: DEFAULT_BUTTONS }), { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
+  } catch (e) {
+    return new Response(JSON.stringify({ success: false, message: e.message }), { status: 500, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
+  }
+}
+
+// ---------- 文章 ----------
 async function handleGetBlogs(env) {
   try {
     if (!env || !env.BLOG_KV) return new Response(JSON.stringify({ list: [], error: "KV绑定不存在" }), { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
@@ -326,6 +337,7 @@ export async function onRequest(context) {
   if (method === "OPTIONS") return handleOptions();
   if (method === "GET" && path === "/api/buttons") return handleGetButtons(env);
   if (method === "POST" && path === "/api/buttons") return handleSaveButtons(request, env);
+  if (method === "POST" && path === "/api/buttons/reset") return handleResetButtons(request, env);
   if (method === "GET" && path === "/api/featured") return handleGetFeaturedPost(env);
   if (method === "GET" && path === "/api/logo") return handleGetLogo(env);
   if (method === "POST" && path === "/api/logo/upload") return handleUploadLogo(request, env);
@@ -395,8 +407,9 @@ button:hover{background:#1c7ed6}
 .btn-secondary{background:#adb5bd}
 .btn-danger{background:#fa5252}
 .btn-pin{background:#ff922b}
+.btn-reset{background:#ff7800}
 .hidden{display:none}
-.modal{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:1000}
+.modal{position:fixed;top=0;left=0;right=0;bottom=0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:1000}
 .modal.hidden{display:none}
 .modal-content{background:white;border-radius:12px;width:90%;max-width:600px;max-height:80vh;overflow-y:auto;padding:24px}
 .modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
@@ -448,7 +461,10 @@ button:hover{background:#1c7ed6}
       <button onclick="closeButtonsModal()" style="padding:6px 12px">关闭</button>
     </div>
     <div id="buttonsList"></div>
-    <button onclick="saveButtons()" style="width:100%;margin-top:20px">保存设置</button>
+    <div style="display:flex;gap:12px;margin-top:20px">
+      <button onclick="saveButtons()" style="flex:1">保存设置</button>
+      <button onclick="resetButtons()" class="btn-reset" style="flex:1">恢复默认</button>
+    </div>
   </div>
 </div>
 <script>
@@ -493,25 +509,13 @@ function updateLogoDisplay(url) {
   }
 }
 
-// 关键修复：初始化时确保有默认按钮
 async function loadQuickButtons() {
   try {
     var res = await fetch("/api/buttons");
-    if (res.ok) {
-      quickButtons = await res.json();
-    } else {
-      quickButtons = ${JSON.stringify(DEFAULT_BUTTONS)};
-    }
-    // 确保quickButtons是数组并且有数据
-    if (!quickButtons || !Array.isArray(quickButtons) || quickButtons.length === 0) {
-      quickButtons = ${JSON.stringify(DEFAULT_BUTTONS)};
-    }
+    quickButtons = await res.json() || [];
     renderQuickButtons();
   } catch(e) {
     console.error("加载按钮失败:", e);
-    // 异常时使用默认按钮
-    quickButtons = ${JSON.stringify(DEFAULT_BUTTONS)};
-    renderQuickButtons();
   }
 }
 
@@ -519,15 +523,10 @@ function renderQuickButtons() {
   var container = document.getElementById("quickButtonsGrid");
   if (!container) return;
   var html = "";
-  // 确保数组存在且不为空
-  if (!quickButtons || !Array.isArray(quickButtons) || quickButtons.length === 0) {
-    html = "<div style='grid-column: span 2;text-align:center;color:#adb5bd'>暂无快捷链接</div>";
-  } else {
-    for (var i = 0; i < quickButtons.length; i++) {
-      var btn = quickButtons[i];
-      if (btn && btn.enabled !== false && btn.url && btn.name) {
-        html += "<a href=\\"" + escapeHtml(btn.url) + "\\" class=\\"quick-btn\\" target=\\"_blank\\" rel=\\"noopener noreferrer\\">" + escapeHtml(btn.name) + "</a>";
-      }
+  for (var i = 0; i < quickButtons.length; i++) {
+    var btn = quickButtons[i];
+    if (btn.enabled !== false) {
+      html += "<a href=\\"" + escapeHtml(btn.url) + "\\" class=\\"quick-btn\\" target=\\"_blank\\" rel=\\"noopener noreferrer\\">" + escapeHtml(btn.name) + "</a>";
     }
   }
   container.innerHTML = html;
@@ -858,10 +857,44 @@ async function saveButtons() {
     });
   }
   try {
-    var res = await fetch("/api/buttons", {method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+localStorage.getItem("token")},body:JSON.stringify(newButtons)});
-    if (res.ok) { alert("保存成功"); await loadQuickButtons(); closeButtonsModal(); }
-    else { alert("保存失败"); }
-  } catch(e) { alert("保存失败"); }
+    var res = await fetch("/api/buttons", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + localStorage.getItem("token") },
+      body: JSON.stringify(newButtons)
+    });
+    if (res.ok) {
+      alert("保存成功");
+      quickButtons = newButtons;
+      renderQuickButtons();
+      closeButtonsModal();
+    } else {
+      alert("保存失败");
+    }
+  } catch(e) {
+    alert("保存失败");
+  }
+}
+
+// 恢复默认按钮
+async function resetButtons() {
+  if (!confirm("确定恢复默认10个快捷按钮？")) return;
+  try {
+    var res = await fetch("/api/buttons/reset", {
+      method: "POST",
+      headers: { "Authorization": "Bearer " + localStorage.getItem("token") }
+    });
+    var data = await res.json();
+    if (data.success) {
+      alert("已恢复默认");
+      quickButtons = data.buttons;
+      renderQuickButtons();
+      openButtonsModal();
+    } else {
+      alert("恢复失败");
+    }
+  } catch(e) {
+    alert("恢复失败");
+  }
 }
 
 function insertLink() {
