@@ -1,4 +1,4 @@
-// /functions/[[route]].js - 带置顶功能完整可运行版
+// /functions/[[route]].js - 修复快捷按钮+置顶功能完整版
 
 // ========== 修改这里的用户名和密码 ==========
 const USERNAME = "admin";
@@ -7,7 +7,7 @@ const PASSWORD = "ww123456";
 
 const LOGO_KV_KEY = "site_logo_info";
 const BUTTONS_KV_KEY = "quick_buttons";
-const PINNED_KEY = "pinned_post_id"; // 置顶文章ID单独存一个key
+const PINNED_KEY = "pinned_post_id";
 
 const DEFAULT_BUTTONS = [
   { name: "百度", url: "https://www.baidu.com", enabled: true },
@@ -39,131 +39,58 @@ function getFullUrl(request) {
 
 async function handleGetLogo(env) {
   try {
-    if (!env.BLOG_KV) {
-      return new Response(JSON.stringify({ success: false, url: "" }), {
-        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-      });
-    }
+    if (!env.BLOG_KV) return new Response(JSON.stringify({ success: false, url: "" }), { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
     const logoData = await env.BLOG_KV.get(LOGO_KV_KEY);
     if (logoData) {
       const logo = JSON.parse(logoData);
-      return new Response(JSON.stringify({
-        success: true,
-        url: logo.url,
-        version: logo.version || 0
-      }), {
-        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-      });
+      return new Response(JSON.stringify({ success: true, url: logo.url, version: logo.version || 0 }), { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
     }
-    return new Response(JSON.stringify({ success: false, url: "" }), {
-      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-    });
+    return new Response(JSON.stringify({ success: false, url: "" }), { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
   } catch (e) {
-    return new Response(JSON.stringify({ success: false, url: "", error: e.message }), {
-      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-    });
+    return new Response(JSON.stringify({ success: false, url: "", error: e.message }), { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
   }
 }
 
 async function handleUploadLogo(request, env) {
   const auth = request.headers.get("Authorization");
   const token = auth?.replace("Bearer ", "");
-  if (!token || !verifyToken(token)) {
-    return new Response(JSON.stringify({ success: false, message: "请先登录" }), {
-      status: 401,
-      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-    });
-  }
-
+  if (!token || !verifyToken(token)) return new Response(JSON.stringify({ success: false, message: "请先登录" }), { status: 401, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
   try {
     const formData = await request.formData();
     const file = formData.get("logo");
-    if (!file) {
-      return new Response(JSON.stringify({ success: false, message: "请选择图片" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-      });
-    }
-
-    if (file.size > 2 * 1024 * 1024) {
-      return new Response(JSON.stringify({ success: false, message: "Logo图片不能超过2MB" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-      });
-    }
-
-    if (!file.type.startsWith("image/")) {
-      return new Response(JSON.stringify({ success: false, message: "请上传图片文件" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-      });
-    }
-
+    if (!file) return new Response(JSON.stringify({ success: false, message: "请选择图片" }), { status: 400, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
+    if (file.size > 2 * 1024 * 1024) return new Response(JSON.stringify({ success: false, message: "Logo图片不能超过2MB" }), { status: 400, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
+    if (!file.type.startsWith("image/")) return new Response(JSON.stringify({ success: false, message: "请上传图片文件" }), { status: 400, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
     const buf = await file.arrayBuffer();
     const ext = file.type.split("/")[1] || "png";
     const key = "logo_" + Date.now() + "." + ext;
     await env.BLOG_KV.put(key, buf, { metadata: { type: file.type } });
-
     const url = getFullUrl(request);
     const logoUrl = `${url.protocol}//${url.host}/api/i/${key}`;
-
-    const logoInfo = {
-      url: logoUrl,
-      version: Date.now(),
-      updatedAt: new Date().toISOString()
-    };
+    const logoInfo = { url: logoUrl, version: Date.now(), updatedAt: new Date().toISOString() };
     await env.BLOG_KV.put(LOGO_KV_KEY, JSON.stringify(logoInfo));
-
-    return new Response(JSON.stringify({
-      success: true,
-      url: logoUrl,
-      version: logoInfo.version
-    }), {
-      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-    });
+    return new Response(JSON.stringify({ success: true, url: logoUrl, version: logoInfo.version }), { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
   } catch (e) {
-    return new Response(JSON.stringify({ success: false, message: "上传失败: " + e.message }), {
-      status: 500,
-      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-    });
+    return new Response(JSON.stringify({ success: false, message: "上传失败: " + e.message }), { status: 500, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
   }
 }
 
 async function handleDeleteLogo(request, env) {
   const auth = request.headers.get("Authorization");
   const token = auth?.replace("Bearer ", "");
-  if (!token || !verifyToken(token)) {
-    return new Response(JSON.stringify({ success: false, message: "请先登录" }), {
-      status: 401,
-      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-    });
-  }
-
+  if (!token || !verifyToken(token)) return new Response(JSON.stringify({ success: false, message: "请先登录" }), { status: 401, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
   try {
-    if (!env.BLOG_KV) {
-      return new Response(JSON.stringify({ success: false, message: "KV未绑定" }), {
-        status: 500,
-        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-      });
-    }
+    if (!env.BLOG_KV) return new Response(JSON.stringify({ success: false, message: "KV未绑定" }), { status: 500, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
     const logoData = await env.BLOG_KV.get(LOGO_KV_KEY);
     if (logoData) {
       const logo = JSON.parse(logoData);
       const urlParts = logo.url.split("/api/i/");
-      if (urlParts.length > 1) {
-        const logoKey = urlParts[1].split("?")[0];
-        await env.BLOG_KV.delete(logoKey);
-      }
+      if (urlParts.length > 1) await env.BLOG_KV.delete(urlParts[1].split("?")[0]);
     }
     await env.BLOG_KV.delete(LOGO_KV_KEY);
-    return new Response(JSON.stringify({ success: true }), {
-      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-    });
+    return new Response(JSON.stringify({ success: true }), { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
   } catch (e) {
-    return new Response(JSON.stringify({ success: false, message: "删除失败: " + e.message }), {
-      status: 500,
-      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-    });
+    return new Response(JSON.stringify({ success: false, message: "删除失败: " + e.message }), { status: 500, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
   }
 }
 
@@ -171,194 +98,99 @@ async function handleLogin(request) {
   try {
     const { username, password } = await request.json();
     if (username === USERNAME && password === PASSWORD) {
-      const token = btoa(JSON.stringify({
-        user: USERNAME,
-        exp: Date.now() + 7 * 24 * 60 * 60 * 1000
-      }));
-      return new Response(JSON.stringify({ success: true, token }), {
-        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-      });
+      const token = btoa(JSON.stringify({ user: USERNAME, exp: Date.now() + 7 * 24 * 60 * 60 * 1000 }));
+      return new Response(JSON.stringify({ success: true, token }), { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
     }
-    return new Response(JSON.stringify({ success: false, message: "用户名或密码错误" }), {
-      status: 401,
-      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-    });
+    return new Response(JSON.stringify({ success: false, message: "用户名或密码错误" }), { status: 401, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
   } catch (e) {
-    return new Response(JSON.stringify({ success: false, message: e.message }), {
-      status: 400,
-      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-    });
+    return new Response(JSON.stringify({ success: false, message: e.message }), { status: 400, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
   }
 }
 
 async function handleUploadImage(request, env) {
   const auth = request.headers.get("Authorization");
   const token = auth?.replace("Bearer ", "");
-  if (!token || !verifyToken(token)) {
-    return new Response(JSON.stringify({ success: false, message: "请先登录" }), {
-      status: 401,
-      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-    });
-  }
+  if (!token || !verifyToken(token)) return new Response(JSON.stringify({ success: false, message: "请先登录" }), { status: 401, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
   try {
     const formData = await request.formData();
     const file = formData.get("file");
-    if (!file) {
-      return new Response(JSON.stringify({ success: false, message: "请选择文件" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-      });
-    }
-
-    if (file.size > 5 * 1024 * 1024) {
-      return new Response(JSON.stringify({ success: false, message: "图片不能超过5MB" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-      });
-    }
-
+    if (!file) return new Response(JSON.stringify({ success: false, message: "请选择文件" }), { status: 400, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
+    if (file.size > 5 * 1024 * 1024) return new Response(JSON.stringify({ success: false, message: "图片不能超过5MB" }), { status: 400, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
     const buf = await file.arrayBuffer();
     const key = "img_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
     await env.BLOG_KV.put(key, buf, { metadata: { type: file.type } });
-
     const url = getFullUrl(request);
     const imageUrl = `${url.protocol}//${url.host}/api/i/${key}`;
-    return new Response(JSON.stringify({ success: true, url: imageUrl }), {
-      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-    });
+    return new Response(JSON.stringify({ success: true, url: imageUrl }), { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
   } catch (e) {
-    return new Response(JSON.stringify({ success: false, message: e.message }), {
-      status: 500,
-      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-    });
+    return new Response(JSON.stringify({ success: false, message: e.message }), { status: 500, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
   }
 }
 
 async function handleGetButtons(env) {
   try {
-    if (!env.BLOG_KV) {
-      return new Response(JSON.stringify(DEFAULT_BUTTONS), {
-        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-      });
-    }
+    if (!env.BLOG_KV) return new Response(JSON.stringify(DEFAULT_BUTTONS), { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
     const buttonsData = await env.BLOG_KV.get(BUTTONS_KV_KEY);
-    if (buttonsData) {
-      return new Response(buttonsData, {
-        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-      });
-    }
-    return new Response(JSON.stringify(DEFAULT_BUTTONS), {
-      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-    });
+    // 关键修复：无数据时强制返回默认按钮
+    if (!buttonsData) return new Response(JSON.stringify(DEFAULT_BUTTONS), { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
+    return new Response(buttonsData, { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
   } catch (e) {
-    return new Response(JSON.stringify(DEFAULT_BUTTONS), {
-      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-    });
+    // 异常时也返回默认按钮
+    return new Response(JSON.stringify(DEFAULT_BUTTONS), { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
   }
 }
 
 async function handleSaveButtons(request, env) {
   const auth = request.headers.get("Authorization");
   const token = auth?.replace("Bearer ", "");
-  if (!token || !verifyToken(token)) {
-    return new Response(JSON.stringify({ success: false, message: "请先登录" }), {
-      status: 401,
-      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-    });
-  }
-
+  if (!token || !verifyToken(token)) return new Response(JSON.stringify({ success: false, message: "请先登录" }), { status: 401, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
   try {
     const buttons = await request.json();
     await env.BLOG_KV.put(BUTTONS_KV_KEY, JSON.stringify(buttons));
-    return new Response(JSON.stringify({ success: true }), {
-      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-    });
+    return new Response(JSON.stringify({ success: true }), { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
   } catch (e) {
-    return new Response(JSON.stringify({ success: false, message: e.message }), {
-      status: 500,
-      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-    });
+    return new Response(JSON.stringify({ success: false, message: e.message }), { status: 500, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
   }
 }
 
 async function handleGetBlogs(env) {
   try {
-    if (!env || !env.BLOG_KV) {
-      return new Response(JSON.stringify({ list: [], error: "KV绑定不存在" }), {
-        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-      });
-    }
-
+    if (!env || !env.BLOG_KV) return new Response(JSON.stringify({ list: [], error: "KV绑定不存在" }), { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
     const list = [];
     const { keys } = await env.BLOG_KV.list();
     const pinnedId = await env.BLOG_KV.get(PINNED_KEY);
-
     for (const key of keys) {
       if (!key.name.startsWith("img_") && !key.name.startsWith("logo_") && key.name !== LOGO_KV_KEY && key.name !== BUTTONS_KV_KEY && key.name !== PINNED_KEY && /^\d+$/.test(key.name)) {
         const value = await env.BLOG_KV.get(key.name);
         if (value) {
           try {
             const post = JSON.parse(value);
-            list.push({
-              id: key.name,
-              title: post.title || "无标题",
-              time: post.time || 0,
-              img: post.img || "",
-              isPinned: key.name === pinnedId
-            });
+            list.push({ id: key.name, title: post.title || "无标题", time: post.time || 0, img: post.img || "", isPinned: key.name === pinnedId });
           } catch (e) {}
         }
       }
     }
-    // 置顶文章排最前
-    list.sort((a, b) => {
-      if (a.isPinned) return -1;
-      if (b.isPinned) return 1;
-      return b.time - a.time;
-    });
-
-    return new Response(JSON.stringify({ list: list }), {
-      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-    });
+    list.sort((a, b) => { if (a.isPinned) return -1; if (b.isPinned) return 1; return b.time - a.time; });
+    return new Response(JSON.stringify({ list: list }), { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
   } catch (e) {
-    return new Response(JSON.stringify({ list: [], error: e.message }), {
-      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-    });
+    return new Response(JSON.stringify({ list: [], error: e.message }), { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
   }
 }
 
-// 首页优先取置顶文章，没有取最新
 async function handleGetFeaturedPost(env) {
   try {
-    if (!env.BLOG_KV) {
-      return new Response(JSON.stringify({ isEmpty: true }), {
-        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-      });
-    }
-
-    // 先读置顶ID
+    if (!env.BLOG_KV) return new Response(JSON.stringify({ isEmpty: true }), { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
     const pinnedId = await env.BLOG_KV.get(PINNED_KEY);
     if (pinnedId) {
       const pinnedPost = await env.BLOG_KV.get(pinnedId);
       if (pinnedPost) {
         const post = JSON.parse(pinnedPost);
-        return new Response(JSON.stringify({
-          id: pinnedId,
-          title: post.title,
-          content: post.content || "",
-          img: post.img || "",
-          time: post.time
-        }), {
-          headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-        });
+        return new Response(JSON.stringify({ id: pinnedId, title: post.title, content: post.content || "", img: post.img || "", time: post.time }), { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
       }
     }
-
-    // 没有置顶，取最新
     const { keys } = await env.BLOG_KV.list();
     let featuredPost = null;
     let latestTime = 0;
-
     for (const key of keys) {
       if (!key.name.startsWith("img_") && !key.name.startsWith("logo_") && key.name !== LOGO_KV_KEY && key.name !== BUTTONS_KV_KEY && key.name !== PINNED_KEY && /^\d+$/.test(key.name)) {
         const value = await env.BLOG_KV.get(key.name);
@@ -367,244 +199,114 @@ async function handleGetFeaturedPost(env) {
             const post = JSON.parse(value);
             if (post.time > latestTime) {
               latestTime = post.time;
-              featuredPost = {
-                id: key.name,
-                title: post.title,
-                content: post.content || "",
-                img: post.img || "",
-                time: post.time
-              };
+              featuredPost = { id: key.name, title: post.title, content: post.content || "", img: post.img || "", time: post.time };
             }
           } catch (e) {}
         }
       }
     }
-
-    return new Response(JSON.stringify(featuredPost || { isEmpty: true }), {
-      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-    });
+    return new Response(JSON.stringify(featuredPost || { isEmpty: true }), { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
   } catch (e) {
-    return new Response(JSON.stringify({ error: e.message }), {
-      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-    });
+    return new Response(JSON.stringify({ error: e.message }), { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
   }
 }
 
-// 置顶/取消置顶接口
 async function handleTogglePin(request, env) {
   const auth = request.headers.get("Authorization");
   const token = auth?.replace("Bearer ", "");
-  if (!token || !verifyToken(token)) {
-    return new Response(JSON.stringify({ success: false, message: "请先登录" }), {
-      status: 401,
-      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-    });
-  }
+  if (!token || !verifyToken(token)) return new Response(JSON.stringify({ success: false, message: "请先登录" }), { status: 401, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
   try {
     const { id } = await request.json();
     const currentPinned = await env.BLOG_KV.get(PINNED_KEY);
     if (currentPinned === id) {
-      // 取消置顶
       await env.BLOG_KV.delete(PINNED_KEY);
-      return new Response(JSON.stringify({ success: true, pinned: false }), {
-        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-      });
+      return new Response(JSON.stringify({ success: true, pinned: false }), { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
     } else {
-      // 设置置顶
       await env.BLOG_KV.put(PINNED_KEY, id);
-      return new Response(JSON.stringify({ success: true, pinned: true }), {
-        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-      });
+      return new Response(JSON.stringify({ success: true, pinned: true }), { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
     }
   } catch (e) {
-    return new Response(JSON.stringify({ success: false, message: e.message }), {
-      status: 500,
-      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-    });
+    return new Response(JSON.stringify({ success: false, message: e.message }), { status: 500, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
   }
 }
 
 async function handleGetBlog(id, env) {
-  if (!id) return new Response(JSON.stringify({ error: "不存在" }), {
-    status: 404,
-    headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-  });
+  if (!id) return new Response(JSON.stringify({ error: "不存在" }), { status: 404, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
   try {
     const value = await env.BLOG_KV.get(id);
-    if (!value) return new Response(JSON.stringify({ error: "文章不存在" }), {
-      status: 404,
-      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-    });
+    if (!value) return new Response(JSON.stringify({ error: "文章不存在" }), { status: 404, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
     const post = JSON.parse(value);
-    return new Response(JSON.stringify({
-      id: id,
-      title: post.title,
-      content: post.content || "",
-      img: post.img || "",
-      time: post.time || 0
-    }), { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
+    return new Response(JSON.stringify({ id: id, title: post.title, content: post.content || "", img: post.img || "", time: post.time || 0 }), { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
   } catch (e) {
-    return new Response(JSON.stringify({ error: e.message }), {
-      status: 500,
-      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-    });
+    return new Response(JSON.stringify({ error: e.message }), { status: 500, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
   }
 }
 
 async function handleCreateBlog(request, env) {
   const auth = request.headers.get("Authorization");
   const token = auth?.replace("Bearer ", "");
-  if (!token || !verifyToken(token)) {
-    return new Response(JSON.stringify({ success: false, message: "请登录" }), {
-      status: 401,
-      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-    });
-  }
-
+  if (!token || !verifyToken(token)) return new Response(JSON.stringify({ success: false, message: "请登录" }), { status: 401, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
   try {
     const data = await request.json();
-    if (!data.title || data.title.trim() === "") {
-      return new Response(JSON.stringify({ success: false, message: "标题不能为空" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-      });
-    }
-
+    if (!data.title || data.title.trim() === "") return new Response(JSON.stringify({ success: false, message: "标题不能为空" }), { status: 400, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
     const id = Date.now().toString();
-    const post = {
-      title: data.title.trim(),
-      content: data.content || "",
-      img: data.img || "",
-      time: Date.now()
-    };
-
+    const post = { title: data.title.trim(), content: data.content || "", img: data.img || "", time: Date.now() };
     await env.BLOG_KV.put(id, JSON.stringify(post));
-
     const saved = await env.BLOG_KV.get(id);
-    if (!saved) {
-      return new Response(JSON.stringify({ success: false, message: "保存失败" }), {
-        status: 500,
-        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-      });
-    }
-
-    return new Response(JSON.stringify({ success: true, id: id }), {
-      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-    });
+    if (!saved) return new Response(JSON.stringify({ success: false, message: "保存失败" }), { status: 500, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
+    return new Response(JSON.stringify({ success: true, id: id }), { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
   } catch (e) {
-    return new Response(JSON.stringify({ success: false, message: e.message }), {
-      status: 500,
-      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-    });
+    return new Response(JSON.stringify({ success: false, message: e.message }), { status: 500, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
   }
 }
 
 async function handleUpdateBlog(id, request, env) {
   const auth = request.headers.get("Authorization");
   const token = auth?.replace("Bearer ", "");
-  if (!token || !verifyToken(token)) {
-    return new Response(JSON.stringify({ success: false, message: "请登录" }), {
-      status: 401,
-      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-    });
-  }
-  if (!id) {
-    return new Response(JSON.stringify({ error: "文章ID不存在" }), {
-      status: 400,
-      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-    });
-  }
-
+  if (!token || !verifyToken(token)) return new Response(JSON.stringify({ success: false, message: "请登录" }), { status: 401, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
+  if (!id) return new Response(JSON.stringify({ error: "文章ID不存在" }), { status: 400, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
   try {
     const existing = await env.BLOG_KV.get(id);
-    if (!existing) {
-      return new Response(JSON.stringify({ error: "文章不存在" }), {
-        status: 404,
-        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-      });
-    }
-
+    if (!existing) return new Response(JSON.stringify({ error: "文章不存在" }), { status: 404, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
     const data = await request.json();
-    if (!data.title || data.title.trim() === "") {
-      return new Response(JSON.stringify({ success: false, message: "标题不能为空" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-      });
-    }
-
+    if (!data.title || data.title.trim() === "") return new Response(JSON.stringify({ success: false, message: "标题不能为空" }), { status: 400, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
     const oldPost = JSON.parse(existing);
-    const post = {
-      title: data.title.trim(),
-      content: data.content || "",
-      img: data.img || oldPost.img,
-      time: oldPost.time
-    };
+    const post = { title: data.title.trim(), content: data.content || "", img: data.img || oldPost.img, time: oldPost.time };
     await env.BLOG_KV.put(id, JSON.stringify(post));
-    return new Response(JSON.stringify({ success: true }), {
-      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-    });
+    return new Response(JSON.stringify({ success: true }), { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
   } catch (e) {
-    return new Response(JSON.stringify({ success: false, message: e.message }), {
-      status: 500,
-      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-    });
+    return new Response(JSON.stringify({ success: false, message: e.message }), { status: 500, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
   }
 }
 
 async function handleDeleteBlog(id, request, env) {
   const auth = request.headers.get("Authorization");
   const token = auth?.replace("Bearer ", "");
-  if (!token || !verifyToken(token)) {
-    return new Response(JSON.stringify({ success: false, message: "未授权" }), {
-      status: 401,
-      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-    });
-  }
+  if (!token || !verifyToken(token)) return new Response(JSON.stringify({ success: false, message: "未授权" }), { status: 401, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
   try {
-    // 如果删除的是置顶文章，清除置顶
     const pinnedId = await env.BLOG_KV.get(PINNED_KEY);
     if (pinnedId === id) await env.BLOG_KV.delete(PINNED_KEY);
-
     await env.BLOG_KV.delete(id);
-    return new Response(JSON.stringify({ success: true }), {
-      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-    });
+    return new Response(JSON.stringify({ success: true }), { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
   } catch (e) {
-    return new Response(JSON.stringify({ success: false, message: e.message }), {
-      status: 500,
-      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-    });
+    return new Response(JSON.stringify({ success: false, message: e.message }), { status: 500, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
   }
 }
 
 async function handleGetImage(key, env) {
   if (!key) return new Response("Not Found", { status: 404 });
-
   try {
     const img = await env.BLOG_KV.get(key, { type: "arrayBuffer" });
     if (!img) return new Response("Not Found", { status: 404 });
-
     const meta = await env.BLOG_KV.get(key, { metadata: true });
-    return new Response(img, {
-      headers: {
-        "Content-Type": meta?.type || "image/jpeg",
-        "Cache-Control": "public, max-age=31536000",
-        "Access-Control-Allow-Origin": "*"
-      }
-    });
+    return new Response(img, { headers: { "Content-Type": meta?.type || "image/jpeg", "Cache-Control": "public, max-age=31536000", "Access-Control-Allow-Origin": "*" } });
   } catch (e) {
     return new Response("Error: " + e.message, { status: 500 });
   }
 }
 
 function handleOptions() {
-  return new Response(null, {
-    headers: {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type, Authorization"
-    }
-  });
+  return new Response(null, { headers: { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS", "Access-Control-Allow-Headers": "Content-Type, Authorization" } });
 }
 
 export async function onRequest(context) {
@@ -613,78 +315,24 @@ export async function onRequest(context) {
   const path = url.pathname;
   const method = request.method;
 
-  if (method === "OPTIONS") {
-    return handleOptions();
-  }
+  if (method === "OPTIONS") return handleOptions();
+  if (method === "GET" && path === "/api/buttons") return handleGetButtons(env);
+  if (method === "POST" && path === "/api/buttons") return handleSaveButtons(request, env);
+  if (method === "GET" && path === "/api/featured") return handleGetFeaturedPost(env);
+  if (method === "GET" && path === "/api/logo") return handleGetLogo(env);
+  if (method === "POST" && path === "/api/logo/upload") return handleUploadLogo(request, env);
+  if (method === "DELETE" && path === "/api/logo") return handleDeleteLogo(request, env);
+  if (method === "POST" && path === "/api/login") return handleLogin(request);
+  if (method === "POST" && path === "/api/upload") return handleUploadImage(request, env);
+  if (method === "GET" && path.startsWith("/api/i/")) return handleGetImage(path.replace("/api/i/", ""), env);
+  if (method === "GET" && path === "/api/blog") return handleGetBlogs(env);
+  if (method === "GET" && path.startsWith("/api/blog/") && path !== "/api/blog") return handleGetBlog(path.split("/")[3], env);
+  if (method === "POST" && path === "/api/blog") return handleCreateBlog(request, env);
+  if (method === "PUT" && path.startsWith("/api/blog/")) return handleUpdateBlog(path.split("/")[3], request, env);
+  if (method === "DELETE" && path.startsWith("/api/blog/")) return handleDeleteBlog(path.split("/")[3], request, env);
+  if (method === "POST" && path === "/api/blog/toggle-pin") return handleTogglePin(request, env);
 
-  if (method === "GET" && path === "/api/buttons") {
-    return handleGetButtons(env);
-  }
-
-  if (method === "POST" && path === "/api/buttons") {
-    return handleSaveButtons(request, env);
-  }
-
-  if (method === "GET" && path === "/api/featured") {
-    return handleGetFeaturedPost(env);
-  }
-
-  if (method === "GET" && path === "/api/logo") {
-    return handleGetLogo(env);
-  }
-
-  if (method === "POST" && path === "/api/logo/upload") {
-    return handleUploadLogo(request, env);
-  }
-
-  if (method === "DELETE" && path === "/api/logo") {
-    return handleDeleteLogo(request, env);
-  }
-
-  if (method === "POST" && path === "/api/login") {
-    return handleLogin(request);
-  }
-
-  if (method === "POST" && path === "/api/upload") {
-    return handleUploadImage(request, env);
-  }
-
-  if (method === "GET" && path.startsWith("/api/i/")) {
-    const key = path.replace("/api/i/", "");
-    return handleGetImage(key, env);
-  }
-
-  if (method === "GET" && path === "/api/blog") {
-    return handleGetBlogs(env);
-  }
-
-  if (method === "GET" && path.startsWith("/api/blog/") && path !== "/api/blog") {
-    const id = path.split("/")[3];
-    return handleGetBlog(id, env);
-  }
-
-  if (method === "POST" && path === "/api/blog") {
-    return handleCreateBlog(request, env);
-  }
-
-  if (method === "PUT" && path.startsWith("/api/blog/")) {
-    const id = path.split("/")[3];
-    return handleUpdateBlog(id, request, env);
-  }
-
-  if (method === "DELETE" && path.startsWith("/api/blog/")) {
-    const id = path.split("/")[3];
-    return handleDeleteBlog(id, request, env);
-  }
-
-  // 置顶接口
-  if (method === "POST" && path === "/api/blog/toggle-pin") {
-    return handleTogglePin(request, env);
-  }
-
-  return new Response(getHTML(), {
-    headers: { "Content-Type": "text/html;charset=UTF-8" }
-  });
+  return new Response(getHTML(), { headers: { "Content-Type": "text/html;charset=UTF-8" } });
 }
 
 function getHTML() {
@@ -837,13 +485,19 @@ function updateLogoDisplay(url) {
   }
 }
 
+// 关键修复：初始化时强制赋值默认按钮
 async function loadQuickButtons() {
   try {
     var res = await fetch("/api/buttons");
-    quickButtons = await res.json();
+    // 无论接口返回什么，都确保有默认按钮
+    quickButtons = await res.json() || [];
+    if (quickButtons.length === 0) quickButtons = ${JSON.stringify(DEFAULT_BUTTONS)};
     renderQuickButtons();
   } catch(e) {
     console.error("加载按钮失败:", e);
+    // 异常时使用默认按钮
+    quickButtons = ${JSON.stringify(DEFAULT_BUTTONS)};
+    renderQuickButtons();
   }
 }
 
@@ -851,10 +505,15 @@ function renderQuickButtons() {
   var container = document.getElementById("quickButtonsGrid");
   if (!container) return;
   var html = "";
-  for (var i = 0; i < quickButtons.length; i++) {
-    var btn = quickButtons[i];
-    if (btn.enabled !== false) {
-      html += "<a href=\\"" + escapeHtml(btn.url) + "\\" class=\\"quick-btn\\" target=\\"_blank\\" rel=\\"noopener noreferrer\\">" + escapeHtml(btn.name) + "</a>";
+  // 修复：遍历前确保数组存在
+  if (!quickButtons || quickButtons.length === 0) {
+    html = "<div style='grid-column: span 2;text-align:center;color:#adb5bd'>暂无快捷链接</div>";
+  } else {
+    for (var i = 0; i < quickButtons.length; i++) {
+      var btn = quickButtons[i];
+      if (btn.enabled !== false) {
+        html += "<a href=\\"" + escapeHtml(btn.url) + "\\" class=\\"quick-btn\\" target=\\"_blank\\" rel=\\"noopener noreferrer\\">" + escapeHtml(btn.name) + "</a>";
+      }
     }
   }
   container.innerHTML = html;
