@@ -305,14 +305,14 @@ body{background:#f5f7fa;font-family:-apple-system,BlinkMacSystemFont,Roboto,Aria
 .editor{background:#fff;border-radius:12px;padding:24px}
 .editor-title{width:100%;padding:12px;border:1px solid #dee2e6;border-radius:8px;font-size:20px;margin-bottom:16px}
 .toolbar{background:#f8f9fa;border:1px solid #dee2e6;border-radius:8px;padding:8px;display:flex;gap:6px;margin-bottom:12px}
-.toolbar button{padding:6px 12px;background:#e9ecef;border:none;border-radius:4px}
-.editor-text{width:100%;min-height:300px;padding:16px;border:1px solid #dee2e6;border-radius:8px;line-height:1.6}
+.toolbar button{padding:6px 12px;background:#e9ecef;border:none;border-radius:4px;cursor:pointer}
+.editor-text{width:100%;min-height:300px;padding:16px;border:1px solid #dee2e6;border-radius:8px;line-height:1.6;font-family:monospace}
 .action{display:flex;gap:12px;margin-top:20px}
 button{padding:10px 20px;background:#228be6;color:#fff;border:none;border-radius:6px;cursor:pointer}
 .btn2{background:#adb5bd}
 .btn-danger{background:#fa5252}
-.hidden{display:none}
-.modal{position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center}
+.hidden{display:none !important}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:1000}
 .modal-content{background:#fff;border-radius:12px;width:90%;max-width:600px;padding:24px;max-height:80vh;overflow:auto}
 .btn-item{display:flex;gap:12px;margin-bottom:12px;align-items:center}
 .btn-item input{flex:1;padding:8px 12px;border:1px solid #dee2e6;border-radius:6px}
@@ -351,6 +351,7 @@ button{padding:10px 20px;background:#228be6;color:#fff;border:none;border-radius
   </div>
 </div>
 
+<!-- 快捷按钮设置模态框 - 默认隐藏 -->
 <div id="modal" class="modal hidden">
   <div class="modal-content">
     <div style="display:flex;justify-content:space-between;margin-bottom:20px">
@@ -370,104 +371,131 @@ let quickList = [];
 let posts = [];
 let currentId = null;
 
+function esc(s){
+  if(!s) return "";
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
 async function loadLogo(){
-  const r=await fetch("/api/logo");
-  const d=await r.json();
-  logoUrl=d.url||"";
-  if(logoUrl){
-    document.getElementById("logoImg").src=logoUrl;
-    document.getElementById("logoImg").classList.remove("hidden");
-    document.getElementById("logoPlaceholder").style.display="none";
-  }
+  try {
+    const r = await fetch("/api/logo");
+    const d = await r.json();
+    logoUrl = d.url || "";
+    if(logoUrl){
+      document.getElementById("logoImg").src = logoUrl;
+      document.getElementById("logoImg").classList.remove("hidden");
+      document.getElementById("logoPlaceholder").style.display = "none";
+    }
+  } catch(e) { console.error(e); }
 }
 
 async function loadQuick(){
-  const r=await fetch("/api/buttons");
-  quickList=await r.json();
-  renderQuick();
+  try {
+    const r = await fetch("/api/buttons");
+    quickList = await r.json();
+    renderQuick();
+  } catch(e) { console.error(e); }
 }
 
 function renderQuick(){
-  const g=document.getElementById("quickGrid");
-  let h="";
-  quickList.forEach(b=>{
-    if(b.enabled!==false)h+='<a href="'+esc(b.url)+'" class="quick-a" target="_blank">'+esc(b.name)+'</a>';
+  const g = document.getElementById("quickGrid");
+  if(!g) return;
+  let h = "";
+  quickList.forEach(b => {
+    if(b.enabled !== false) h += '<a href="'+esc(b.url)+'" class="quick-a" target="_blank">'+esc(b.name)+'</a>';
   });
-  g.innerHTML=h;
+  g.innerHTML = h;
 }
 
 async function loadPosts(){
-  const r=await fetch("/api/blog");
-  const d=await r.json();
-  posts=d.list||[];
-  renderArtList();
+  try {
+    const r = await fetch("/api/blog");
+    const d = await r.json();
+    posts = d.list || [];
+    renderArtList();
+  } catch(e) { console.error(e); }
 }
 
 function renderArtList(){
-  const o=document.getElementById("artList");
-  if(posts.length===0){o.innerHTML="<div style='text-align:center;color:#ccc'>暂无文章</div>";return;}
-  let h="";
-  posts.forEach(p=>{
-    const act=currentId===p.id?"active":"";
-    const top=p.top?" <span style='color:#ff6b6b'>[置顶]</span>":"";
-    h+='<div class="art-item '+act+'" onclick="openPost(\''+p.id+'\')">'+
-      '<div class="art-title-text">'+esc(p.title)+top+'</div>'+
-      '<div class="art-time">'+new Date(p.time).toLocaleDateString()+'</div>'+
+  const o = document.getElementById("artList");
+  if(!o) return;
+  if(posts.length === 0){
+    o.innerHTML = "<div style='text-align:center;color:#ccc'>暂无文章</div>";
+    return;
+  }
+  let h = "";
+  posts.forEach(p => {
+    const act = currentId === p.id ? "active" : "";
+    const top = p.top ? " <span style='color:#ff6b6b'>[置顶]</span>" : "";
+    h += '<div class="art-item '+act+'" onclick="openPost(\''+p.id+'\')">' +
+      '<div class="art-title-text">'+esc(p.title)+top+'</div>' +
+      '<div class="art-time">'+new Date(p.time).toLocaleDateString()+'</div>' +
     '</div>';
   });
-  o.innerHTML=h;
+  o.innerHTML = h;
 }
 
 async function loadTop(){
-  const r=await fetch("/api/featured");
-  const p=await r.json();
-  if(p&&!p.isEmpty&&p.id){
-    currentId=p.id;
-    showPost(p);
-    renderArtList();
-  }else if(posts.length>0){
-    openPost(posts[0].id);
-  }else{
-    showEmpty();
-  }
+  try {
+    const r = await fetch("/api/featured");
+    const p = await r.json();
+    if(p && !p.isEmpty && p.id){
+      currentId = p.id;
+      showPost(p);
+      renderArtList();
+    } else if(posts.length > 0){
+      openPost(posts[0].id);
+    } else {
+      showEmpty();
+    }
+  } catch(e) { console.error(e); }
 }
 
 async function openPost(id){
-  const r=await fetch("/api/blog/"+id);
-  const p=await r.json();
-  currentId=id;
-  showPost(p);
-  renderArtList();
+  try {
+    const r = await fetch("/api/blog/"+id);
+    const p = await r.json();
+    currentId = id;
+    showPost(p);
+    renderArtList();
+  } catch(e) { console.error(e); }
 }
 
 function showPost(p){
-  const m=document.getElementById("mainContent");
-  const t=localStorage.getItem("token");
-  const edit=t?'<div style="margin-top:30px;display:flex;gap:12px">'+
-    '<button class="btn2" onclick="edit(\''+p.id+'\')">编辑</button>'+
-    '<button class="btn-danger" onclick="del(\''+p.id+'\')">删除</button>'+
-  '</div>':"";
-  const top=p.top?" <span style='color:#ff6b6b'>[置顶]</span>":"";
-  m.innerHTML='<div class="card">'+
-    '<h1 class="post-title">'+esc(p.title||"无标题")+top+'</h1>'+
-    '<div class="post-meta">'+new Date(p.time).toLocaleString()+'</div>'+
-    (p.img?'<img src="'+p.img+'" class="post-img">':"")+
-    '<div class="post-content">'+(p.content||"").replace(/\\n/g,"<br>")+'</div>'+
-    edit+
+  const m = document.getElementById("mainContent");
+  if(!m) return;
+  const t = localStorage.getItem("token");
+  const edit = t ? '<div style="margin-top:30px;display:flex;gap:12px">' +
+    '<button class="btn2" onclick="edit(\''+p.id+'\')">编辑</button>' +
+    '<button class="btn-danger" onclick="del(\''+p.id+'\')">删除</button>' +
+  '</div>' : "";
+  const top = p.top ? " <span style='color:#ff6b6b'>[置顶]</span>" : "";
+  m.innerHTML = '<div class="card">' +
+    '<h1 class="post-title">'+esc(p.title||"无标题")+top+'</h1>' +
+    '<div class="post-meta">'+new Date(p.time).toLocaleString()+'</div>' +
+    (p.img ? '<img src="'+p.img+'" class="post-img">' : "") +
+    '<div class="post-content">'+(p.content||"").replace(/\\n/g,"<br>")+'</div>' +
+    edit +
   '</div>';
 }
 
 function showEmpty(){
-  document.getElementById("mainContent").innerHTML='<div class="card empty">暂无文章<br><br><button onclick="showPublish()">发布文章</button></div>';
+  const m = document.getElementById("mainContent");
+  if(m) m.innerHTML = '<div class="card empty">暂无文章<br><br><button onclick="showPublish()">发布文章</button></div>';
 }
 
 function updateNav(){
-  const t=!!localStorage.getItem("token");
-  document.getElementById("publishBtn").classList.toggle("hidden",!t);
-  document.getElementById("manageBtn").classList.toggle("hidden",!t);
-  document.getElementById("loginBtn").classList.toggle("hidden",t);
-  document.getElementById("logoutBtn").classList.toggle("hidden",!t);
-  document.getElementById("editQuick").classList.toggle("hidden",!t);
+  const t = !!localStorage.getItem("token");
+  const publishBtn = document.getElementById("publishBtn");
+  const manageBtn = document.getElementById("manageBtn");
+  const loginBtn = document.getElementById("loginBtn");
+  const logoutBtn = document.getElementById("logoutBtn");
+  const editQuick = document.getElementById("editQuick");
+  if(publishBtn) publishBtn.classList.toggle("hidden", !t);
+  if(manageBtn) manageBtn.classList.toggle("hidden", !t);
+  if(loginBtn) loginBtn.classList.toggle("hidden", t);
+  if(logoutBtn) logoutBtn.classList.toggle("hidden", !t);
+  if(editQuick) editQuick.classList.toggle("hidden", !t);
 }
 
 function logout(){
@@ -478,196 +506,276 @@ function logout(){
 }
 
 function showLogin(){
-  document.getElementById("mainContent").innerHTML='<div class="card">'+
-    '<h2>登录</h2>'+
-    '<div style="margin-top:20px">'+
-      '<input id="u" placeholder="用户名" style="width:100%;padding:10px;margin-bottom:12px;border:1px solid #ddd;border-radius:6px">'+
-      '<input id="p" type="password" placeholder="密码" style="width:100%;padding:10px;margin-bottom:20px;border:1px solid #ddd;border-radius:6px">'+
-      '<button onclick="login()" style="width:100%">登录</button>'+
-    '</div>'+
+  const m = document.getElementById("mainContent");
+  if(!m) return;
+  m.innerHTML = '<div class="card">' +
+    '<h2>登录</h2>' +
+    '<div style="margin-top:20px">' +
+      '<input id="u" placeholder="用户名" style="width:100%;padding:10px;margin-bottom:12px;border:1px solid #ddd;border-radius:6px">' +
+      '<input id="p" type="password" placeholder="密码" style="width:100%;padding:10px;margin-bottom:20px;border:1px solid #ddd;border-radius:6px">' +
+      '<button onclick="login()" style="width:100%">登录</button>' +
+    '</div>' +
   '</div>';
 }
 
 async function login(){
-  const u=document.getElementById("u").value;
-  const p=document.getElementById("p").value;
-  const r=await fetch("/api/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:u,password:p})});
-  const d=await r.json();
-  if(d.success){
-    localStorage.setItem("token",d.token);
-    updateNav();
-    await loadPosts();
-    await loadTop();
-  }else alert("登录失败，请检查用户名和密码");
+  const u = document.getElementById("u").value;
+  const p = document.getElementById("p").value;
+  try {
+    const r = await fetch("/api/login", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({username: u, password: p})
+    });
+    const d = await r.json();
+    if(d.success){
+      localStorage.setItem("token", d.token);
+      updateNav();
+      await loadPosts();
+      await loadTop();
+    } else {
+      alert("登录失败，请检查用户名和密码");
+    }
+  } catch(e) { alert("登录失败"); }
 }
 
 function showPublish(){
-  if(!localStorage.getItem("token")){showLogin();return;}
-  currentImg="";editId=null;
-  document.getElementById("mainContent").innerHTML='<div class="editor">'+
-    '<h2>写文章</h2>'+
-    '<input id="title" class="editor-title" placeholder="标题">'+
-    '<div style="margin:12px 0"><label><input type="checkbox" id="top"> 设为置顶</label></div>'+
-    '<div class="toolbar">'+
-      '<button type="button" onclick="fmt(\'bold\')">B</button>'+
-      '<button type="button" onclick="fmt(\'italic\')">I</button>'+
-      '<button type="button" onclick="fmt(\'underline\')">U</button>'+
-      '<button type="button" onclick="fmt(\'h3\')">H3</button>'+
-      '<button type="button" onclick="link()">🔗链接</button>'+
-      '<button type="button" onclick="img()">🖼️图片</button>'+
-    '</div>'+
-    '<textarea id="text" class="editor-text" placeholder="内容"></textarea>'+
-    '<div style="margin:16px 0">'+
-      '<input type="file" id="file" accept="image/*">'+
-      '<button type="button" onclick="upImg()">上传封面</button>'+
-    '</div>'+
-    '<div id="prev"></div>'+
-    '<div class="action">'+
-      '<button type="button" onclick="pub()">发布</button>'+
-      '<button type="button" class="btn2" onclick="loadTop()">取消</button>'+
-    '</div>'+
+  if(!localStorage.getItem("token")){ showLogin(); return; }
+  currentImg = "";
+  editId = null;
+  const m = document.getElementById("mainContent");
+  if(!m) return;
+  m.innerHTML = '<div class="editor">' +
+    '<h2>写文章</h2>' +
+    '<input id="title" class="editor-title" placeholder="标题">' +
+    '<div style="margin:12px 0"><label><input type="checkbox" id="top"> 设为置顶</label></div>' +
+    '<div class="toolbar">' +
+      '<button type="button" onclick="fmt(\'bold\')">B</button>' +
+      '<button type="button" onclick="fmt(\'italic\')">I</button>' +
+      '<button type="button" onclick="fmt(\'underline\')">U</button>' +
+      '<button type="button" onclick="fmt(\'h3\')">H3</button>' +
+      '<button type="button" onclick="link()">🔗链接</button>' +
+      '<button type="button" onclick="img()">🖼️图片</button>' +
+    '</div>' +
+    '<textarea id="text" class="editor-text" placeholder="内容"></textarea>' +
+    '<div style="margin:16px 0">' +
+      '<input type="file" id="file" accept="image/*">' +
+      '<button type="button" onclick="upImg()">上传封面</button>' +
+    '</div>' +
+    '<div id="prev"></div>' +
+    '<div class="action">' +
+      '<button type="button" onclick="pub()">发布</button>' +
+      '<button type="button" class="btn2" onclick="loadTop()">取消</button>' +
+    '</div>' +
   '</div>';
 }
 
 async function upImg(){
-  const f=document.getElementById("file").files[0];
-  if(!f)return;
-  const d=new FormData();d.append("file",f);
-  const r=await fetch("/api/upload",{method:"POST",headers:{"Authorization":"Bearer "+localStorage.getItem("token")},body:d});
-  const j=await r.json();
-  if(j.success){
-    currentImg=j.url;
-    document.getElementById("prev").innerHTML='<img src="'+j.url+'" style="max-width:200px;border-radius:8px"><br><button type="button" onclick="currentImg=\'\';document.getElementById(\'prev\').innerHTML=\'\'">移除</button>';
-  } else {
-    alert("上传失败");
-  }
+  const f = document.getElementById("file").files[0];
+  if(!f) return;
+  const d = new FormData();
+  d.append("file", f);
+  try {
+    const r = await fetch("/api/upload", {
+      method: "POST",
+      headers: {"Authorization": "Bearer "+localStorage.getItem("token")},
+      body: d
+    });
+    const j = await r.json();
+    if(j.success){
+      currentImg = j.url;
+      document.getElementById("prev").innerHTML = '<img src="'+j.url+'" style="max-width:200px;border-radius:8px"><br><button type="button" onclick="currentImg=\'\';document.getElementById(\'prev\').innerHTML=\'\'">移除</button>';
+    } else {
+      alert("上传失败");
+    }
+  } catch(e) { alert("上传失败"); }
 }
 
 async function pub(){
-  const t=document.getElementById("title").value.trim();
-  const c=document.getElementById("text").value;
-  const top=document.getElementById("top").checked;
-  if(!t){alert("标题不能为空");return;}
-  const r=await fetch("/api/blog",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+localStorage.getItem("token")},body:JSON.stringify({title:t,content:c,img:currentImg,top})});
-  const d=await r.json();
-  if(d.success){alert("发布成功");await loadPosts();await loadTop();}
-  else alert("发布失败");
+  const t = document.getElementById("title").value.trim();
+  const c = document.getElementById("text").value;
+  const top = document.getElementById("top").checked;
+  if(!t){ alert("标题不能为空"); return; }
+  try {
+    const r = await fetch("/api/blog", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer "+localStorage.getItem("token")
+      },
+      body: JSON.stringify({title: t, content: c, img: currentImg, top: top})
+    });
+    const d = await r.json();
+    if(d.success){
+      alert("发布成功");
+      await loadPosts();
+      await loadTop();
+    } else {
+      alert("发布失败");
+    }
+  } catch(e) { alert("发布失败"); }
 }
 
 async function edit(id){
-  if(!localStorage.getItem("token")){showLogin();return;}
-  const r=await fetch("/api/blog/"+id);
-  const p=await r.json();
-  editId=id;currentImg=p.img||"";
-  document.getElementById("mainContent").innerHTML='<div class="editor">'+
-    '<h2>编辑</h2>'+
-    '<input id="title" class="editor-title" value="'+esc(p.title)+'">'+
-    '<div style="margin:12px 0"><label><input type="checkbox" id="top" '+(p.top?"checked":"")+'> 设为置顶</label></div>'+
-    '<div class="toolbar">'+
-      '<button type="button" onclick="fmt(\'bold\')">B</button>'+
-      '<button type="button" onclick="fmt(\'italic\')">I</button>'+
-      '<button type="button" onclick="fmt(\'underline\')">U</button>'+
-      '<button type="button" onclick="fmt(\'h3\')">H3</button>'+
-      '<button type="button" onclick="link()">🔗链接</button>'+
-      '<button type="button" onclick="img()">🖼️图片</button>'+
-    '</div>'+
-    '<textarea id="text" class="editor-text">'+esc(p.content)+'</textarea>'+
-    '<div style="margin:16px 0">'+
-      '<input type="file" id="file" accept="image/*">'+
-      '<button type="button" onclick="upImg()">上传封面</button>'+
-    '</div>'+
-    '<div id="prev"></div>'+
-    '<div class="action">'+
-      '<button type="button" onclick="update()">保存</button>'+
-      '<button type="button" class="btn2" onclick="loadTop()">取消</button>'+
-    '</div>'+
-  '</div>';
-  if(currentImg)document.getElementById("prev").innerHTML='<img src="'+currentImg+'" style="max-width:200px;border-radius:8px"><br><button type="button" onclick="currentImg=\'\';document.getElementById(\'prev\').innerHTML=\'\'">移除</button>';
+  if(!localStorage.getItem("token")){ showLogin(); return; }
+  try {
+    const r = await fetch("/api/blog/"+id);
+    const p = await r.json();
+    editId = id;
+    currentImg = p.img || "";
+    const m = document.getElementById("mainContent");
+    if(!m) return;
+    m.innerHTML = '<div class="editor">' +
+      '<h2>编辑</h2>' +
+      '<input id="title" class="editor-title" value="'+esc(p.title)+'">' +
+      '<div style="margin:12px 0"><label><input type="checkbox" id="top" '+(p.top?"checked":"")+'> 设为置顶</label></div>' +
+      '<div class="toolbar">' +
+        '<button type="button" onclick="fmt(\'bold\')">B</button>' +
+        '<button type="button" onclick="fmt(\'italic\')">I</button>' +
+        '<button type="button" onclick="fmt(\'underline\')">U</button>' +
+        '<button type="button" onclick="fmt(\'h3\')">H3</button>' +
+        '<button type="button" onclick="link()">🔗链接</button>' +
+        '<button type="button" onclick="img()">🖼️图片</button>' +
+      '</div>' +
+      '<textarea id="text" class="editor-text">'+esc(p.content)+'</textarea>' +
+      '<div style="margin:16px 0">' +
+        '<input type="file" id="file" accept="image/*">' +
+        '<button type="button" onclick="upImg()">上传封面</button>' +
+      '</div>' +
+      '<div id="prev"></div>' +
+      '<div class="action">' +
+        '<button type="button" onclick="update()">保存</button>' +
+        '<button type="button" class="btn2" onclick="loadTop()">取消</button>' +
+      '</div>' +
+    '</div>';
+    if(currentImg) {
+      document.getElementById("prev").innerHTML = '<img src="'+currentImg+'" style="max-width:200px;border-radius:8px"><br><button type="button" onclick="currentImg=\'\';document.getElementById(\'prev\').innerHTML=\'\'">移除</button>';
+    }
+  } catch(e) { console.error(e); }
 }
 
 async function update(){
-  const t=document.getElementById("title").value.trim();
-  const c=document.getElementById("text").value;
-  const top=document.getElementById("top").checked;
-  if(!t){alert("标题不能为空");return;}
-  const r=await fetch("/api/blog/"+editId,{method:"PUT",headers:{"Content-Type":"application/json","Authorization":"Bearer "+localStorage.getItem("token")},body:JSON.stringify({title:t,content:c,img:currentImg,top})});
-  const d=await r.json();
-  if(d.success){alert("保存成功");await loadPosts();await loadTop();}
-  else alert("保存失败");
+  const t = document.getElementById("title").value.trim();
+  const c = document.getElementById("text").value;
+  const top = document.getElementById("top").checked;
+  if(!t){ alert("标题不能为空"); return; }
+  try {
+    const r = await fetch("/api/blog/"+editId, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer "+localStorage.getItem("token")
+      },
+      body: JSON.stringify({title: t, content: c, img: currentImg, top: top})
+    });
+    const d = await r.json();
+    if(d.success){
+      alert("保存成功");
+      await loadPosts();
+      await loadTop();
+    } else {
+      alert("保存失败");
+    }
+  } catch(e) { alert("保存失败"); }
 }
 
 async function del(id){
-  if(!confirm("确定删除？"))return;
-  await fetch("/api/blog/"+id,{method:"DELETE",headers:{"Authorization":"Bearer "+localStorage.getItem("token")}});
-  await loadPosts();await loadTop();
+  if(!confirm("确定删除？")) return;
+  try {
+    await fetch("/api/blog/"+id, {
+      method: "DELETE",
+      headers: {"Authorization": "Bearer "+localStorage.getItem("token")}
+    });
+    await loadPosts();
+    await loadTop();
+  } catch(e) { alert("删除失败"); }
 }
 
 function showManage(){
-  if(!localStorage.getItem("token")){showLogin();return;}
-  const logo=logoUrl?'<img src="'+logoUrl+'" style="width:80px;height:80px;border-radius:50%">':'<div style="width:80px;height:80px;background:#f1f3f5;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:40px">📷</div>';
-  document.getElementById("mainContent").innerHTML='<div class="card">'+
-    '<h2>管理</h2>'+
-    '<div style="margin-bottom:30px;padding:20px;background:#f8f9fa;border-radius:12px">'+
-      '<h3>Logo</h3>'+logo+'<br>'+
-      '<button type="button" onclick="document.getElementById(\'logoFile\').click()">更换</button>'+
-      (logoUrl?'<button type="button" class="btn-danger" style="margin-left:10px" onclick="delLogo()">恢复默认</button>':'')+
-      '<input type="file" id="logoFile" accept="image/*" hidden onchange="upLogo(this.files[0])">'+
-    '</div>'+
-    '<div style="margin-bottom:30px"><h3>快捷按钮</h3><button type="button" onclick="openModal()">设置</button></div>'+
-    '<div><h3>文章</h3><div id="managePosts"></div></div>'+
+  if(!localStorage.getItem("token")){ showLogin(); return; }
+  const logo = logoUrl ? '<img src="'+logoUrl+'" style="width:80px;height:80px;border-radius:50%">' : '<div style="width:80px;height:80px;background:#f1f3f5;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:40px">📷</div>';
+  const m = document.getElementById("mainContent");
+  if(!m) return;
+  m.innerHTML = '<div class="card">' +
+    '<h2>管理</h2>' +
+    '<div style="margin-bottom:30px;padding:20px;background:#f8f9fa;border-radius:12px">' +
+      '<h3>Logo</h3>'+logo+'<br>' +
+      '<button type="button" onclick="document.getElementById(\'logoFile\').click()">更换</button>' +
+      (logoUrl ? '<button type="button" class="btn-danger" style="margin-left:10px" onclick="delLogo()">恢复默认</button>' : '') +
+      '<input type="file" id="logoFile" accept="image/*" hidden onchange="upLogo(this.files[0])">' +
+    '</div>' +
+    '<div style="margin-bottom:30px"><h3>快捷按钮</h3><button type="button" onclick="openModal()">设置</button></div>' +
+    '<div><h3>文章</h3><div id="managePosts"></div></div>' +
   '</div>';
   renderManagePosts();
 }
 
 async function upLogo(f){
-  const d=new FormData();d.append("logo",f);
-  await fetch("/api/logo/upload",{method:"POST",headers:{"Authorization":"Bearer "+localStorage.getItem("token")},body:d});
-  location.reload();
+  if(!f) return;
+  const d = new FormData();
+  d.append("logo", f);
+  try {
+    await fetch("/api/logo/upload", {
+      method: "POST",
+      headers: {"Authorization": "Bearer "+localStorage.getItem("token")},
+      body: d
+    });
+    location.reload();
+  } catch(e) { alert("上传失败"); }
 }
 
 async function delLogo(){
-  await fetch("/api/logo",{method:"DELETE",headers:{"Authorization":"Bearer "+localStorage.getItem("token")}});
-  location.reload();
+  try {
+    await fetch("/api/logo", {
+      method: "DELETE",
+      headers: {"Authorization": "Bearer "+localStorage.getItem("token")}
+    });
+    location.reload();
+  } catch(e) { alert("删除失败"); }
 }
 
 function renderManagePosts(){
-  const o=document.getElementById("managePosts");
-  let h="";
-  posts.forEach(p=>{
-    const top=p.top?" <span style='color:#ff6b6b'>[置顶]</span>":"";
-    h+='<div style="border:1px solid #e9ecef;border-radius:8px;padding:12px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center">'+
-      '<div><strong>'+esc(p.title)+'</strong>'+top+'<br><small>'+new Date(p.time).toLocaleDateString()+'</small></div>'+
-      '<div><button type="button" class="btn2" onclick="edit(\''+p.id+'\')">编辑</button><button type="button" class="btn-danger" onclick="del(\''+p.id+'\')">删除</button></div>'+
+  const o = document.getElementById("managePosts");
+  if(!o) return;
+  let h = "";
+  posts.forEach(p => {
+    const top = p.top ? " <span style='color:#ff6b6b'>[置顶]</span>" : "";
+    h += '<div style="border:1px solid #e9ecef;border-radius:8px;padding:12px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center">' +
+      '<div><strong>'+esc(p.title)+'</strong>'+top+'<br><small>'+new Date(p.time).toLocaleDateString()+'</small></div>' +
+      '<div><button type="button" class="btn2" onclick="edit(\''+p.id+'\')">编辑</button><button type="button" class="btn-danger" onclick="del(\''+p.id+'\')">删除</button></div>' +
     '</div>';
   });
-  o.innerHTML=h;
+  o.innerHTML = h;
 }
 
 function openModal(){
-  const m=document.getElementById("modalList");
-  let h="";
-  quickList.forEach((b,i)=>{
-    h+='<div class="btn-item">'+
-      '<input value="'+esc(b.name)+'" id="n'+i+'">'+
-      '<input value="'+esc(b.url)+'" id="u'+i+'">'+
-      '<label><input type="checkbox" id="e'+i+'" '+(b.enabled!==false?"checked":"")+'>启用</label>'+
+  const modal = document.getElementById("modal");
+  if(!modal) return;
+  const m = document.getElementById("modalList");
+  let h = "";
+  quickList.forEach((b, i) => {
+    h += '<div class="btn-item">' +
+      '<input value="'+esc(b.name)+'" id="n'+i+'">' +
+      '<input value="'+esc(b.url)+'" id="u'+i+'">' +
+      '<label><input type="checkbox" id="e'+i+'" '+(b.enabled!==false?"checked":"")+'>启用</label>' +
     '</div>';
   });
-  m.innerHTML=h;
-  document.getElementById("modal").classList.remove("hidden");
+  if(m) m.innerHTML = h;
+  modal.classList.remove("hidden");
 }
 
 function closeModal(){
-  document.getElementById("modal").classList.add("hidden");
+  const modal = document.getElementById("modal");
+  if(modal) modal.classList.add("hidden");
 }
 
 async function saveQuick(){
-  const arr=[];
-  quickList.forEach((_,i)=>{
+  const arr = [];
+  quickList.forEach((_, i) => {
     const nameInput = document.getElementById("n"+i);
     const urlInput = document.getElementById("u"+i);
     const enabledInput = document.getElementById("e"+i);
-    if (nameInput && urlInput && enabledInput) {
+    if(nameInput && urlInput && enabledInput){
       arr.push({
         name: nameInput.value,
         url: urlInput.value,
@@ -675,47 +783,54 @@ async function saveQuick(){
       });
     }
   });
-  await fetch("/api/buttons",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+localStorage.getItem("token")},body:JSON.stringify(arr)});
-  closeModal();
-  loadQuick();
+  try {
+    await fetch("/api/buttons", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer "+localStorage.getItem("token")
+      },
+      body: JSON.stringify(arr)
+    });
+    closeModal();
+    loadQuick();
+  } catch(e) { alert("保存失败"); }
 }
 
 function link(){
-  const t=document.getElementById("text");
-  const s=t.selectionStart;
-  const e=t.selectionEnd;
-  const sel=t.value.substring(s,e);
-  const u=prompt("链接：");
-  if(!u)return;
-  const txt=sel||prompt("文字：");
+  const t = document.getElementById("text");
+  if(!t) return;
+  const s = t.selectionStart;
+  const e = t.selectionEnd;
+  const sel = t.value.substring(s, e);
+  const u = prompt("链接：");
+  if(!u) return;
+  const txt = sel || prompt("文字：");
   if(!txt) return;
-  t.value=t.value.substring(0,s)+'<a href="'+u+'" target="_blank">'+txt+'</a>'+t.value.substring(e);
+  t.value = t.value.substring(0, s) + '<a href="'+esc(u)+'" target="_blank">'+esc(txt)+'</a>' + t.value.substring(e);
 }
 
 function img(){
-  const u=prompt("图片地址：");
-  if(!u)return;
-  const t=document.getElementById("text");
-  const s=t.selectionStart;
-  t.value=t.value.substring(0,s)+'<img src="'+u+'" style="max-width:100%">'+t.value.substring(s);
+  const u = prompt("图片地址：");
+  if(!u) return;
+  const t = document.getElementById("text");
+  if(!t) return;
+  const s = t.selectionStart;
+  t.value = t.value.substring(0, s) + '<img src="'+esc(u)+'" style="max-width:100%">' + t.value.substring(s);
 }
 
-function fmt(t){
-  const a=document.getElementById("text");
-  const s=a.selectionStart;
-  const e=a.selectionEnd;
-  const v=a.value.substring(s,e);
-  let r="";
-  if(t==="bold")r='<strong>'+v+'</strong>';
-  if(t==="italic")r='<em>'+v+'</em>';
-  if(t==="underline")r='<u>'+v+'</u>';
-  if(t==="h3")r='<h3>'+v+'</h3>';
-  a.value=a.value.substring(0,s)+r+a.value.substring(e);
-}
-
-function esc(s){
-  if(!s)return"";
-  return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+function fmt(type){
+  const a = document.getElementById("text");
+  if(!a) return;
+  const s = a.selectionStart;
+  const e = a.selectionEnd;
+  const v = a.value.substring(s, e);
+  let r = "";
+  if(type === "bold") r = '<strong>'+v+'</strong>';
+  else if(type === "italic") r = '<em>'+v+'</em>';
+  else if(type === "underline") r = '<u>'+v+'</u>';
+  else if(type === "h3") r = '<h3>'+v+'</h3>';
+  a.value = a.value.substring(0, s) + r + a.value.substring(e);
 }
 
 async function init(){
