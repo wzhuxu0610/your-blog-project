@@ -1,4 +1,4 @@
-// /functions/[[route]].js - Cloudflare Pages Functions（修复版）
+// /functions/[[route]].js - Cloudflare Pages Functions（修复模态框显示问题）
 
 // ========== 修改这里的用户名和密码 ==========
 const USERNAME = "admin";
@@ -9,16 +9,16 @@ const LOGO_KV_KEY = "site_logo_info";
 const BUTTONS_KV_KEY = "quick_buttons";
 
 const DEFAULT_BUTTONS = [
-  { name: "按钮1", url: "https://example.com/1", enabled: true },
-  { name: "按钮2", url: "https://example.com/2", enabled: true },
-  { name: "按钮3", url: "https://example.com/3", enabled: true },
-  { name: "按钮4", url: "https://example.com/4", enabled: true },
-  { name: "按钮5", url: "https://example.com/5", enabled: true },
-  { name: "按钮6", url: "https://example.com/6", enabled: true },
-  { name: "按钮7", url: "https://example.com/7", enabled: true },
-  { name: "按钮8", url: "https://example.com/8", enabled: true },
-  { name: "按钮9", url: "https://example.com/9", enabled: true },
-  { name: "按钮10", url: "https://example.com/10", enabled: true }
+  { name: "百度", url: "https://www.baidu.com", enabled: true },
+  { name: "谷歌", url: "https://www.google.com", enabled: true },
+  { name: "GitHub", url: "https://github.com", enabled: true },
+  { name: "淘宝", url: "https://www.taobao.com", enabled: true },
+  { name: "京东", url: "https://www.jd.com", enabled: true },
+  { name: "哔哩哔哩", url: "https://www.bilibili.com", enabled: true },
+  { name: "知乎", url: "https://www.zhihu.com", enabled: true },
+  { name: "微博", url: "https://weibo.com", enabled: true },
+  { name: "抖音", url: "https://www.douyin.com", enabled: true },
+  { name: "网易云音乐", url: "https://music.163.com", enabled: true }
 ];
 
 function verifyToken(token) {
@@ -633,7 +633,10 @@ function getHTML() {
 '.btn-danger{background:#fa5252}\n' +
 '.btn-danger:hover{background:#f03e3e}\n' +
 '.hidden{display:none}\n' +
+
+/* 模态框 - 默认隐藏 */ +
 '.modal{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:1000}\n' +
+'.modal.hidden{display:none}\n' +
 '.modal-content{background:white;border-radius:12px;width:90%;max-width:600px;max-height:80vh;overflow-y:auto;padding:24px}\n' +
 '.modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}\n' +
 '.btn-item{display:flex;gap:12px;margin-bottom:12px;align-items:center}\n' +
@@ -678,6 +681,8 @@ function getHTML() {
 '    </div>\n' +
 '  </div>\n' +
 '</div>\n' +
+
+'<!-- 模态框 - 默认隐藏，点击管理按钮才显示 -->\n' +
 '<div id="buttonsModal" class="modal hidden">\n' +
 '  <div class="modal-content">\n' +
 '    <div class="modal-header">\n' +
@@ -688,6 +693,7 @@ function getHTML() {
 '    <button onclick="saveButtons()" style="width:100%;margin-top:20px">保存设置</button>\n' +
 '  </div>\n' +
 '</div>\n' +
+
 '<script>\n' +
 'var currentImage = "";\n' +
 'var editId = null;\n' +
