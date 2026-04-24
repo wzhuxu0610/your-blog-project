@@ -526,8 +526,8 @@ function getHTML() {
 '.container{max-width:900px;margin:0 auto;background:white;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.08);overflow:hidden}' +
 '.header{display:flex;justify-content:space-between;align-items:center;padding:16px 24px;background:#fff;border-bottom:1px solid #e9ecef}' +
 '.logo-area{display:flex;align-items:center;gap:12px}' +
-'.logo-img{width:40px;height:40px;border-radius:50%;object-fit:cover;border:2px solid #e9ecef}' +
-'.logo-placeholder{width:40px;height:40px;border-radius:50%;background:#f1f3f5;display:flex;align-items:center;justify-content:center;font-size:20px;color:#adb5bd}' +
+'.logo-img{width:120px;height:120px;border-radius:50%;object-fit:cover;border:2px solid #e9ecef}' +
+'.logo-placeholder{width:120px;height:120px;border-radius:50%;background:#f1f3f5;display:flex;align-items:center;justify-content:center;font-size:20px;color:#adb5bd}' +
 '.blog-title{font-size:20px;font-weight:600;color:#212529}' +
 '.nav{display:flex;gap:20px}' +
 '.nav a{color:#495057;cursor:pointer;text-decoration:none;font-size:15px;padding:4px 0}' +
