@@ -1,4 +1,4 @@
- // ==正确的代码	绑定KV空间，创建KV空间名称：blog_kv（可自定义，建议用英文）变量名：BLOG_KV
+// ==正确的代码	绑定KV空间，创建KV空间名称：blog_kv（可自定义，建议用英文）变量名：BLOG_KV
 export async function onRequest(context) {
   const { request, env } = context;
   const url = new URL(request.url);
@@ -108,8 +108,9 @@ export async function onRequest(context) {
       const key = "logo_" + Date.now() + "." + ext;
       await env.BLOG_KV.put(key, buf, { metadata: { type: file.type } });
 
-      const url = getFullUrl(request);
-      const logoUrl = `${url.protocol}//${url.host}/api/i/${key}`;
+      const host = request.headers.get('host');
+      const protocol = request.url.startsWith('https') ? 'https' : 'http';
+      const logoUrl = `${protocol}://${host}/api/i/${key}`;
 
       const logoInfo = {
         url: logoUrl,
@@ -225,8 +226,9 @@ export async function onRequest(context) {
       const key = "img_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
       await env.BLOG_KV.put(key, buf, { metadata: { type: file.type } });
 
-      const url = getFullUrl(request);
-      const imageUrl = `${url.protocol}//${url.host}/api/i/${key}`;
+      const host = request.headers.get('host');
+      const protocol = request.url.startsWith('https') ? 'https' : 'http';
+      const imageUrl = `${protocol}://${host}/api/i/${key}`;
       return new Response(JSON.stringify({ success: true, url: imageUrl }), {
         headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
       });
@@ -306,7 +308,8 @@ export async function onRequest(context) {
                 id: key.name,
                 title: post.title || "无标题",
                 time: post.time || 0,
-                img: post.img || ""
+                img: post.img || "",
+                top: post.top || false
               });
             } catch (e) {}
           }
@@ -332,8 +335,8 @@ export async function onRequest(context) {
         });
       }
       const { keys } = await env.BLOG_KV.list();
-      let featuredPost = null;
-      let latestTime = 0;
+      let topPosts = [];
+      let allPosts = [];
 
       for (const key of keys) {
         if (!key.name.startsWith("img_") && !key.name.startsWith("logo_") && key.name !== LOGO_KV_KEY && key.name !== BUTTONS_KV_KEY && /^\d+$/.test(key.name)) {
@@ -341,19 +344,30 @@ export async function onRequest(context) {
           if (value) {
             try {
               const post = JSON.parse(value);
-              if (post.time > latestTime) {
-                latestTime = post.time;
-                featuredPost = {
-                  id: key.name,
-                  title: post.title,
-                  content: post.content || "",
-                  img: post.img || "",
-                  time: post.time
-                };
+              const postItem = {
+                id: key.name,
+                title: post.title,
+                content: post.content || "",
+                img: post.img || "",
+                time: post.time,
+                top: post.top || false
+              };
+              allPosts.push(postItem);
+              if(postItem.top){
+                topPosts.push(postItem);
               }
             } catch (e) {}
           }
         }
+      }
+
+      let featuredPost = null;
+      if(topPosts.length > 0){
+        topPosts.sort((a,b) => b.time - a.time);
+        featuredPost = topPosts[0];
+      }else if(allPosts.length > 0){
+        allPosts.sort((a,b) => b.time - a.time);
+        featuredPost = allPosts[0];
       }
 
       return new Response(JSON.stringify(featuredPost || { isEmpty: true }), {
@@ -383,7 +397,8 @@ export async function onRequest(context) {
         title: post.title,
         content: post.content || "",
         img: post.img || "",
-        time: post.time || 0
+        time: post.time || 0,
+        top: post.top || false
       }), { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
     } catch (e) {
       return new Response(JSON.stringify({ error: e.message }), {
@@ -417,7 +432,8 @@ export async function onRequest(context) {
         title: data.title.trim(),
         content: data.content || "",
         img: data.img || "",
-        time: Date.now()
+        time: Date.now(),
+        top: data.top || false
       };
 
       await env.BLOG_KV.put(id, JSON.stringify(post));
@@ -479,7 +495,8 @@ export async function onRequest(context) {
         title: data.title.trim(),
         content: data.content || "",
         img: data.img || oldPost.img,
-        time: oldPost.time
+        time: oldPost.time,
+        top: data.top !== undefined ? data.top : oldPost.top || false
       };
       await env.BLOG_KV.put(id, JSON.stringify(post));
       return new Response(JSON.stringify({ success: true }), {
@@ -807,8 +824,9 @@ function renderArticlesList() {
   for (var i = 0; i < allPosts.length; i++) {
     var post = allPosts[i];
     var activeClass = (currentPostId === post.id) ? "active" : "";
+    var topTag = post.top ? " <span style='color:#ff6b6b'>[置顶]</span>" : "";
     html += "<div class=\\"article-item " + activeClass + "\\" onclick=\\"loadPost('" + post.id + "')\\">" +
-      "<div class=\\"article-title\\">" + escapeHtml(post.title) + "</div>" +
+      "<div class=\\"article-title\\">" + escapeHtml(post.title) + topTag + "</div>" +
       "<div class=\\"article-time\\">" + new Date(post.time).toLocaleDateString() + "</div>" +
       "</div>";
   }
@@ -856,8 +874,9 @@ function displayPost(post) {
   if (token && post.id) {
     editHtml = "<div style=\\"margin-top:30px;display:flex;gap:12px\\"><button class=\\"btn-secondary\\" onclick=\\"editPost('" + post.id + "')\\">编辑文章</button><button class=\\"btn-danger\\" onclick=\\"deletePost('" + post.id + "')\\">删除文章</button></div>";
   }
+  var topTag = post.top ? " <span style='color:#ff6b6b'>[置顶]</span>" : "";
   var html = "<div class=\\"content-card\\">" +
-    "<h1 class=\\"post-title\\">" + escapeHtml(post.title || "无标题") + "</h1>" +
+    "<h1 class=\\"post-title\\">" + escapeHtml(post.title || "无标题") + topTag + "</h1>" +
     "<div class=\\"post-meta\\">发布时间：" + (post.time ? new Date(post.time).toLocaleString() : "未知") + "</div>" +
     (post.img ? "<img src=\\"" + post.img + "\\" class=\\"post-img\\" alt=\\"封面\\">" : "") +
     "<div class=\\"post-content\\">" + (post.content ? post.content.replace(/\\n/g, "<br>") : "") + "</div>" +
@@ -923,7 +942,7 @@ function showPublish() {
   editId = null;
   currentImage = "";
   var container = document.getElementById("mainContent");
-  container.innerHTML = "<div class=\\"editor-container\\"><h2>发布文章</h2><div style=\\"margin-top:20px\\"><input id=title type=text placeholder=标题 class=\\"editor-title\\"><div class=\\"toolbar\\"><button onclick=\\"formatText(\\"bold\\")\\">B</button><button onclick=\\"formatText(\\"italic\\")\\">I</button><button onclick=\\"formatText(\\"underline\\")\\">U</button><button onclick=\\"formatText(\\"h3\\")\\">H3</button><button onclick=\\"insertLink()\\">🔗链接</button><button onclick=\\"insertImage()\\">🖼️图片</button></div><textarea id=contentText class=\\"editor-content\\" placeholder=内容></textarea><div class=\\"upload-area\\"><input type=file id=imgFile accept=image/*><button onclick=\\"uploadImg()\\">上传封面</button></div><div id=preview></div><div class=\\"action-buttons\\"><button onclick=\\"doPublish()\\">发布文章</button><button class=\\"btn-secondary\\" onclick=\\"loadFeaturedPost()\\">取消</button></div></div></div>";
+  container.innerHTML = "<div class=\\"editor-container\\"><h2>发布文章</h2><div style=\\"margin-top:20px\\"><input id=title type=text placeholder=标题 class=\\"editor-title\\"><div style=\\"margin:12px 0\\"><label><input type=\\"checkbox\\" id=\\"postTop\\"> 设为置顶文章</label></div><div class=\\"toolbar\\"><button onclick=\\"formatText(\\"bold\\")\\">B</button><button onclick=\\"formatText(\\"italic\\")\\">I</button><button onclick=\\"formatText(\\"underline\\")\\">U</button><button onclick=\\"formatText(\\"h3\\")\\">H3</button><button onclick=\\"insertLink()\\">🔗链接</button><button onclick=\\"insertImage()\\">🖼️图片</button></div><textarea id=contentText class=\\"editor-content\\" placeholder=内容></textarea><div class=\\"upload-area\\"><input type=file id=imgFile accept=image/*><button onclick=\\"uploadImg()\\">上传封面</button></div><div id=preview></div><div class=\\"action-buttons\\"><button onclick=\\"doPublish()\\">发布文章</button><button class=\\"btn-secondary\\" onclick=\\"loadFeaturedPost()\\">取消</button></div></div></div>";
 }
 
 async function uploadImg() {
@@ -947,9 +966,10 @@ function removeImg() { currentImage = ""; document.getElementById("preview").inn
 async function doPublish() {
   var title = document.getElementById("title").value.trim();
   var content = document.getElementById("contentText").value;
+  var isTop = document.getElementById("postTop").checked;
   if(!title){ alert("请输入标题"); return; }
   try{
-    var res = await fetch("/api/blog",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+localStorage.getItem("token")},body:JSON.stringify({title:title,content:content,img:currentImage})});
+    var res = await fetch("/api/blog",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+localStorage.getItem("token")},body:JSON.stringify({title:title,content:content,img:currentImage,top:isTop})});
     var data = await res.json();
     if(data.success){ alert("发布成功"); await loadArticlesList(); await loadFeaturedPost(); }
     else { alert("发布失败"); }
@@ -965,7 +985,7 @@ async function editPost(id) {
     editId = id;
     currentImage = p.img || "";
     var container = document.getElementById("mainContent");
-    container.innerHTML = "<div class=\\"editor-container\\"><h2>编辑文章</h2><div style=\\"margin-top:20px\\"><input id=title type=text placeholder=标题 class=\\"editor-title\\" value=\\""+escapeHtml(p.title)+"\\"><div class=\\"toolbar\\"><button onclick=\\"formatText(\\"bold\\")\\">B</button><button onclick=\\"formatText(\\"italic\\")\\">I</button><button onclick=\\"formatText(\\"underline\\")\\">U</button><button onclick=\\"formatText(\\"h3\\")\\">H3</button><button onclick=\\"insertLink()\\">🔗链接</button><button onclick=\\"insertImage()\\">🖼️图片</button></div><textarea id=contentText class=\\"editor-content\\" placeholder=内容>"+escapeHtml(p.content)+"</textarea><div class=\\"upload-area\\"><input type=file id=imgFile accept=image/*><button onclick=\\"uploadImg()\\">上传封面</button></div><div id=preview></div><div class=\\"action-buttons\\"><button onclick=\\"doUpdate()\\">更新文章</button><button class=\\"btn-secondary\\" onclick=\\"loadFeaturedPost()\\">取消</button></div></div></div>";
+    container.innerHTML = "<div class=\\"editor-container\\"><h2>编辑文章</h2><div style=\\"margin-top:20px\\"><input id=title type=text placeholder=标题 class=\\"editor-title\\" value=\\""+escapeHtml(p.title)+"\\"><div style=\\"margin:12px 0\\"><label><input type=\\"checkbox\\" id=\\"postTop\\" "+(p.top?"checked":"")+"> 设为置顶文章</label></div><div class=\\"toolbar\\"><button onclick=\\"formatText(\\"bold\\")\\">B</button><button onclick=\\"formatText(\\"italic\\")\\">I</button><button onclick=\\"formatText(\\"underline\\")\\">U</button><button onclick=\\"formatText(\\"h3\\")\\">H3</button><button onclick=\\"insertLink()\\">🔗链接</button><button onclick=\\"insertImage()\\">🖼️图片</button></div><textarea id=contentText class=\\"editor-content\\" placeholder=内容>"+escapeHtml(p.content)+"</textarea><div class=\\"upload-area\\"><input type=file id=imgFile accept=image/*><button onclick=\\"uploadImg()\\">上传封面</button></div><div id=preview></div><div class=\\"action-buttons\\"><button onclick=\\"doUpdate()\\">更新文章</button><button class=\\"btn-secondary\\" onclick=\\"loadFeaturedPost()\\">取消</button></div></div></div>";
     if(currentImage){ document.getElementById("preview").innerHTML = "<img src=\\""+currentImage+"\\" class=\\"preview-img\\"><br><button onclick=\\"removeImg()\\">移除图片</button>"; }
   } catch(e){ alert("加载失败"); }
 }
@@ -973,9 +993,10 @@ async function editPost(id) {
 async function doUpdate() {
   var title = document.getElementById("title").value.trim();
   var content = document.getElementById("contentText").value;
+  var isTop = document.getElementById("postTop").checked;
   if(!title){ alert("请输入标题"); return; }
   try{
-    var res = await fetch("/api/blog/"+editId,{method:"PUT",headers:{"Content-Type":"application/json","Authorization":"Bearer "+localStorage.getItem("token")},body:JSON.stringify({title:title,content:content,img:currentImage})});
+    var res = await fetch("/api/blog/"+editId,{method:"PUT",headers:{"Content-Type":"application/json","Authorization":"Bearer "+localStorage.getItem("token")},body:JSON.stringify({title:title,content:content,img:currentImage,top:isTop})});
     var data = await res.json();
     if(data.success){ alert("更新成功"); await loadArticlesList(); await loadFeaturedPost(); }
     else { alert("更新失败"); }
@@ -1016,8 +1037,9 @@ async function renderManagePosts() {
   var html = "";
   for (var i = 0; i < allPosts.length; i++) {
     var p = allPosts[i];
+    var topTag = p.top ? " <span style='color:#ff6b6b'>[置顶]</span>" : "";
     html += "<div style=\\"border:1px solid #e9ecef;border-radius:8px;padding:12px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center\\">" +
-      "<div><strong>" + escapeHtml(p.title) + "</strong><br><small>" + new Date(p.time).toLocaleDateString() + "</small></div>" +
+      "<div><strong>" + escapeHtml(p.title) + "</strong>"+topTag+"<br><small>" + new Date(p.time).toLocaleDateString() + "</small></div>" +
       "<div><button class=\\"btn-secondary\\" style=\\"margin-right:8px\\" onclick=\\"editPost('" + p.id + "')\\">编辑</button><button class=\\"btn-danger\\" onclick=\\"deletePost('" + p.id + "')\\">删除</button></div></div>";
   }
   container.innerHTML = html;
