@@ -1,4 +1,4 @@
-// /functions/[[route]].js - Cloudflare Pages Functions（左侧栏布局版 - 引号已修复）
+// /functions/[[route]].js - Cloudflare Pages Functions（修复版）
 
 // ========== 修改这里的用户名和密码 ==========
 const USERNAME = "admin";
@@ -8,7 +8,6 @@ const PASSWORD = "ww123456";
 const LOGO_KV_KEY = "site_logo_info";
 const BUTTONS_KV_KEY = "quick_buttons";
 
-// 默认按钮配置
 const DEFAULT_BUTTONS = [
   { name: "按钮1", url: "https://example.com/1", enabled: true },
   { name: "按钮2", url: "https://example.com/2", enabled: true },
@@ -640,7 +639,6 @@ function getHTML() {
 '.btn-item{display:flex;gap:12px;margin-bottom:12px;align-items:center}\n' +
 '.btn-item input{flex:1;padding:8px 12px;border:1px solid #dee2e6;border-radius:6px}\n' +
 '.btn-item input:first-child{flex:0.3}\n' +
-'.btn-item .delete-btn-small{padding:6px 12px;background:#fa5252;font-size:12px}\n' +
 '@media (max-width:768px){.sidebar{width:240px}.main-content{margin-left:240px;padding:16px}.post-title{font-size:22px}}\n' +
 '</style>\n' +
 '</head>\n' +
@@ -652,7 +650,7 @@ function getHTML() {
 '        <img class="sidebar-logo hidden" id="sidebarLogo" alt="Logo">\n' +
 '        <div style="width:60px;height:60px;border-radius:50%;background:#f1f3f5;margin:0 auto 12px auto;display:flex;align-items:center;justify-content:center;font-size:30px;" id="sidebarLogoPlaceholder">📷</div>\n' +
 '      </div>\n' +
-'      <div class="sidebar-title" id="siteTitle">我的博客</div>\n' +
+'      <div class="sidebar-title">我的博客</div>\n' +
 '    </div>\n' +
 '    <div class="quick-buttons">\n' +
 '      <div class="quick-buttons-title">\n' +
@@ -668,10 +666,10 @@ function getHTML() {
 '  </div>\n' +
 '  <div class="main-content">\n' +
 '    <div class="header-nav">\n' +
-'      <a id="publishNavBtn" class="nav-link hidden" onclick="showPublish()">写文章</a>\n' +
-'      <a id="manageNavBtn" class="nav-link hidden" onclick="showManage()">管理</a>\n' +
-'      <a id="loginNavBtn" class="nav-link login-btn" onclick="showLogin()">登录</a>\n' +
-'      <a id="logoutNavBtn" class="nav-link hidden" onclick="logout()">退出</a>\n' +
+'      <a id="publishNavBtn" class="nav-link hidden" href="javascript:void(0)" onclick="showPublish()">写文章</a>\n' +
+'      <a id="manageNavBtn" class="nav-link hidden" href="javascript:void(0)" onclick="showManage()">管理</a>\n' +
+'      <a id="loginNavBtn" class="nav-link login-btn" href="javascript:void(0)" onclick="showLogin()">登录</a>\n' +
+'      <a id="logoutNavBtn" class="nav-link hidden" href="javascript:void(0)" onclick="logout()">退出</a>\n' +
 '    </div>\n' +
 '    <div id="mainContent">\n' +
 '      <div class="content-card">\n' +
@@ -715,6 +713,8 @@ function getHTML() {
 '    updateLogoDisplay(null);\n' +
 '  } catch(e) {\n' +
 '    console.error("加载Logo失败:", e);\n' +
+'    currentLogoUrl = "";\n' +
+'    updateLogoDisplay(null);\n' +
 '  }\n' +
 '}\n' +
 '\n' +
@@ -849,11 +849,11 @@ function getHTML() {
 '  var loginBtn = document.getElementById("loginNavBtn");\n' +
 '  var logoutBtn = document.getElementById("logoutNavBtn");\n' +
 '  var editButtonsBtn = document.getElementById("editButtonsBtn");\n' +
-'  if(publishBtn) publishBtn.classList.toggle("hidden", !isLoggedIn);\n' +
-'  if(manageBtn) manageBtn.classList.toggle("hidden", !isLoggedIn);\n' +
-'  if(loginBtn) loginBtn.classList.toggle("hidden", isLoggedIn);\n' +
-'  if(logoutBtn) logoutBtn.classList.toggle("hidden", !isLoggedIn);\n' +
-'  if(editButtonsBtn) editButtonsBtn.classList.toggle("hidden", !isLoggedIn);\n' +
+'  if(publishBtn) { if(isLoggedIn) publishBtn.classList.remove("hidden"); else publishBtn.classList.add("hidden"); }\n' +
+'  if(manageBtn) { if(isLoggedIn) manageBtn.classList.remove("hidden"); else manageBtn.classList.add("hidden"); }\n' +
+'  if(loginBtn) { if(isLoggedIn) loginBtn.classList.add("hidden"); else loginBtn.classList.remove("hidden"); }\n' +
+'  if(logoutBtn) { if(isLoggedIn) logoutBtn.classList.remove("hidden"); else logoutBtn.classList.add("hidden"); }\n' +
+'  if(editButtonsBtn) { if(isLoggedIn) editButtonsBtn.classList.remove("hidden"); else editButtonsBtn.classList.add("hidden"); }\n' +
 '}\n' +
 '\n' +
 'function logout() {\n' +
@@ -882,8 +882,8 @@ function getHTML() {
 '      updateNav();\n' +
 '      await loadArticlesList();\n' +
 '      await loadFeaturedPost();\n' +
-'    } else { alert("登录失败"); }\n' +
-'  } catch(e){ alert("登录失败"); }\n' +
+'    } else { alert("登录失败: " + (data.message || "用户名或密码错误")); }\n' +
+'  } catch(e){ alert("登录失败: " + e.message); }\n' +
 '}\n' +
 '\n' +
 'function showPublish() {\n' +
@@ -906,8 +906,9 @@ function getHTML() {
 '    if(data.success){\n' +
 '      currentImage = data.url;\n' +
 '      document.getElementById("preview").innerHTML = "<img src=\\""+data.url+"\\" class=\\"preview-img\\"><br><button onclick=\\"removeImg()\\">移除图片</button>";\n' +
-'    } else { alert("上传失败"); }\n' +
-'  } catch(e){ alert("上传失败"); }\n' +
+'      alert("图片上传成功");\n' +
+'    } else { alert("上传失败: " + (data.message || "未知错误")); }\n' +
+'  } catch(e){ alert("上传失败: " + e.message); }\n' +
 '}\n' +
 '\n' +
 'function removeImg() { currentImage = ""; document.getElementById("preview").innerHTML = ""; }\n' +
@@ -920,8 +921,8 @@ function getHTML() {
 '    var res = await fetch("/api/blog",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+localStorage.getItem("token")},body:JSON.stringify({title:title,content:content,img:currentImage})});\n' +
 '    var data = await res.json();\n' +
 '    if(data.success){ alert("发布成功"); await loadArticlesList(); await loadFeaturedPost(); }\n' +
-'    else { alert("发布失败"); }\n' +
-'  } catch(e){ alert("发布失败"); }\n' +
+'    else { alert("发布失败: " + (data.message || "未知错误")); }\n' +
+'  } catch(e){ alert("发布失败: " + e.message); }\n' +
 '}\n' +
 '\n' +
 'async function editPost(id) {\n' +
@@ -935,7 +936,7 @@ function getHTML() {
 '    var container = document.getElementById("mainContent");\n' +
 '    container.innerHTML = "<div class=\\"editor-container\\"><h2>编辑文章</h2><div style=\\"margin-top:20px\\"><input id=title type=text placeholder=标题 class=\\"editor-title\\" value=\\""+escapeHtml(p.title)+"\\"><div class=\\"toolbar\\"><button onclick=\\"formatText(\\"bold\\")\\">B</button><button onclick=\\"formatText(\\"italic\\")\\">I</button><button onclick=\\"formatText(\\"underline\\")\\">U</button><button onclick=\\"formatText(\\"h3\\")\\">H3</button><button onclick=\\"insertLink()\\">🔗链接</button><button onclick=\\"insertImage()\\">🖼️图片</button></div><textarea id=contentText class=\\"editor-content\\" placeholder=内容>"+escapeHtml(p.content)+"</textarea><div class=\\"upload-area\\"><input type=file id=imgFile accept=image/*><button onclick=\\"uploadImg()\\" style=\\"margin-left:10px\\">上传封面</button></div><div id=preview></div><div class=\\"action-buttons\\"><button onclick=\\"doUpdate()\\">更新文章</button><button class=\\"btn-secondary\\" onclick=\\"loadFeaturedPost()\\">取消</button></div></div></div>";\n' +
 '    if(currentImage){ document.getElementById("preview").innerHTML = "<img src=\\""+currentImage+"\\" class=\\"preview-img\\"><br><button onclick=\\"removeImg()\\">移除图片</button>"; }\n' +
-'  } catch(e){ alert("加载失败"); }\n' +
+'  } catch(e){ alert("加载失败: " + e.message); }\n' +
 '}\n' +
 '\n' +
 'async function doUpdate() {\n' +
@@ -946,8 +947,8 @@ function getHTML() {
 '    var res = await fetch("/api/blog/"+editId,{method:"PUT",headers:{"Content-Type":"application/json","Authorization":"Bearer "+localStorage.getItem("token")},body:JSON.stringify({title:title,content:content,img:currentImage})});\n' +
 '    var data = await res.json();\n' +
 '    if(data.success){ alert("更新成功"); await loadArticlesList(); await loadFeaturedPost(); }\n' +
-'    else { alert("更新失败"); }\n' +
-'  } catch(e){ alert("更新失败"); }\n' +
+'    else { alert("更新失败: " + (data.message || "未知错误")); }\n' +
+'  } catch(e){ alert("更新失败: " + e.message); }\n' +
 '}\n' +
 '\n' +
 'async function deletePost(id) {\n' +
@@ -955,8 +956,8 @@ function getHTML() {
 '  try{\n' +
 '    var res = await fetch("/api/blog/"+id,{method:"DELETE",headers:{"Authorization":"Bearer "+localStorage.getItem("token")}});\n' +
 '    if(res.ok){ alert("删除成功"); await loadArticlesList(); await loadFeaturedPost(); }\n' +
-'    else { alert("删除失败"); }\n' +
-'  } catch(e){ alert("删除失败"); }\n' +
+'    else { var err = await res.json(); alert("删除失败: " + (err.message || "未知错误")); }\n' +
+'  } catch(e){ alert("删除失败: " + e.message); }\n' +
 '}\n' +
 '\n' +
 'function showManage() {\n' +
@@ -999,8 +1000,8 @@ function getHTML() {
 '    var res = await fetch("/api/logo/upload", {method:"POST",headers:{"Authorization":"Bearer "+localStorage.getItem("token")},body:formData});\n' +
 '    var data = await res.json();\n' +
 '    if (data.success) { alert("Logo更换成功"); location.reload(); }\n' +
-'    else { alert("上传失败"); }\n' +
-'  } catch(e) { alert("上传失败"); }\n' +
+'    else { alert("上传失败: " + (data.message || "未知错误")); }\n' +
+'  } catch(e) { alert("上传失败: " + e.message); }\n' +
 '}\n' +
 '\n' +
 'async function deleteLogo() {\n' +
@@ -1008,8 +1009,8 @@ function getHTML() {
 '  try {\n' +
 '    var res = await fetch("/api/logo", {method:"DELETE",headers:{"Authorization":"Bearer "+localStorage.getItem("token")}});\n' +
 '    if (res.ok) { alert("已恢复默认"); location.reload(); }\n' +
-'    else { alert("删除失败"); }\n' +
-'  } catch(e) { alert("删除失败"); }\n' +
+'    else { var err = await res.json(); alert("删除失败: " + (err.message || "未知错误")); }\n' +
+'  } catch(e) { alert("删除失败: " + e.message); }\n' +
 '}\n' +
 '\n' +
 'function openButtonsModal() {\n' +
@@ -1030,7 +1031,8 @@ function getHTML() {
 '}\n' +
 '\n' +
 'function closeButtonsModal() {\n' +
-'  document.getElementById("buttonsModal").classList.add("hidden");\n' +
+'  var modal = document.getElementById("buttonsModal");\n' +
+'  if (modal) modal.classList.add("hidden");\n' +
 '}\n' +
 '\n' +
 'async function saveButtons() {\n' +
@@ -1049,7 +1051,7 @@ function getHTML() {
 '    var res = await fetch("/api/buttons", {method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+localStorage.getItem("token")},body:JSON.stringify(newButtons)});\n' +
 '    if (res.ok) { alert("保存成功"); await loadQuickButtons(); closeButtonsModal(); }\n' +
 '    else { alert("保存失败"); }\n' +
-'  } catch(e) { alert("保存失败"); }\n' +
+'  } catch(e) { alert("保存失败: " + e.message); }\n' +
 '}\n' +
 '\n' +
 'function insertLink() {\n' +
